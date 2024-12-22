@@ -113,7 +113,7 @@ class ProductImage(models.Model):
 class ProductInfo(models.Model):
     product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name='info')
     num_of_sales = models.IntegerField(default=0)
-    rate = models.FloatField(default=0.0)
+    # rate = models.FloatField(default=0.0)
 
     def __str__(self):
         return f"{self.product.name} - Info"
