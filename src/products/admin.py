@@ -21,7 +21,7 @@ class ProductAvailabilityInline(admin.TabularInline):
 class RatingInline(admin.TabularInline):
     model = Rating
     extra = 1
-
+    
 # Category admin
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -91,13 +91,47 @@ class ShippingAdmin(admin.ModelAdmin):
     search_fields = ('government',)
 
 # Pill admin
+from django.contrib import admin
+from .models import Pill, CouponDiscount
+
 @admin.register(Pill)
 class PillAdmin(admin.ModelAdmin):
-    list_display = ('status', 'paid', 'date_added')
+    list_display = (
+        'status', 'paid', 'date_added',
+        'price_without_coupons', 'coupon_discount', 'price_after_coupon_discount',
+        'shipping_price', 'final_price'
+    )
     list_filter = ('status', 'paid', 'date_added')
     search_fields = ('pilladdress__name', 'pilladdress__email')
-    readonly_fields = ('get_pill_price', 'pill_price_after_discount', 'pill_price_after_discount_and_shipping', 'pill_price_after_discount_and_shipping_and_coupon', 'shipping_price')
+    readonly_fields = (
+        'price_without_coupons', 'coupon_discount', 'price_after_coupon_discount',
+        'shipping_price', 'final_price'
+    )
 
+    # Custom method to display the coupon discount in the list_display
+    def coupon_discount(self, obj):
+        return obj.coupon_discount()
+    coupon_discount.short_description = 'Coupon Discount'
+
+    # Custom method to display the price without coupons in the list_display
+    def price_without_coupons(self, obj):
+        return obj.price_without_coupons()
+    price_without_coupons.short_description = 'Price Without Coupons'
+
+    # Custom method to display the price after coupon discount in the list_display
+    def price_after_coupon_discount(self, obj):
+        return obj.price_after_coupon_discount()
+    price_after_coupon_discount.short_description = 'Price After Coupon Discount'
+
+    # Custom method to display the shipping price in the list_display
+    def shipping_price(self, obj):
+        return obj.shipping_price()
+    shipping_price.short_description = 'Shipping Price'
+
+    # Custom method to display the final price in the list_display
+    def final_price(self, obj):
+        return obj.final_price()
+    final_price.short_description = 'Final Price'
 # Discount admin
 @admin.register(Discount)
 class DiscountAdmin(admin.ModelAdmin):

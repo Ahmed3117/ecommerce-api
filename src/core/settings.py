@@ -34,11 +34,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     #* Libs
     'corsheaders',
+    'django_filters',
     'rest_framework',
     'rest_framework_api_key',
     'rest_framework_simplejwt',
     'storages',
-    'django_filters',
     #* Apps
     'accounts',
     'products',

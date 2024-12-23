@@ -2,17 +2,44 @@ import random
 import string
 from accounts.models import User
 from django.db import models
+from django.utils import timezone
 
 GOVERNMENT_CHOICES = [
     ('1', 'Cairo'),
-    ('2', 'Alex'),
-    ('3', 'Kafrelshaikh'),
+    ('2', 'Alexandria'),
+    ('3', 'Kafr El Sheikh'),
+    ('4', 'Dakahlia'),
+    ('5', 'Sharqia'),
+    ('6', 'Gharbia'),
+    ('7', 'Monufia'),
+    ('8', 'Qalyubia'),
+    ('9', 'Giza'),
+    ('10', 'Beni Suef'),
+    ('11', 'Fayoum'),
+    ('12', 'Minya'),
+    ('13', 'Assiut'),
+    ('14', 'Sohag'),
+    ('15', 'Qena'),
+    ('16', 'Luxor'),
+    ('17', 'Aswan'),
+    ('18', 'Red Sea'),
+    ('19', 'Beheira'),
+    ('20', 'Ismailia'),
+    ('21', 'Suez'),
+    ('22', 'Port Said'),
+    ('23', 'Damietta'),
+    ('24', 'Matruh'),
+    ('25', 'New Valley'),
+    ('26', 'North Sinai'),
+    ('27', 'South Sinai'),
 ]
 
+
 PILL_STATUS_CHOICES = [
-    ('d', 'Delivered'),
-    ('u', 'Under Delivery'),
+    ('i', 'initiated'),
     ('w', 'Waiting'),
+    ('u', 'Under Delivery'),
+    ('d', 'Delivered'),
     ('r', 'Refused'),
     ('c', 'Canceled'),
 ]
@@ -28,6 +55,22 @@ SIZES_CHOICES = [
     ('xxxxl', 'XXXXL'),
     ('xxxxxl', 'XXXXXL'),
 ]
+
+PAYMENT_CHOICES = [
+    ('c', 'cash'),
+    ('v', 'visa'),
+]
+
+
+def generate_pill_number():
+    """Generate a unique 20-digit pill number."""
+    while True:
+        # Generate a random 20-digit string
+        pill_number = ''.join(random.choices(string.digits, k=20))
+        # Check if the pill number is unique
+        if not Pill.objects.filter(pill_number=pill_number).exists():
+            return pill_number
+
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -59,56 +102,64 @@ class Product(models.Model):
     date_added = models.DateTimeField(auto_now_add=True)
 
     def price_after_product_discount(self):
-        last_product_discount = self.discount_set.last()
+        last_product_discount = self.discounts.last()
         if last_product_discount:
             return self.price - ((last_product_discount.discount / 100) * self.price)
         return self.price
 
     def price_after_category_discount(self):
-        last_category_discount = self.category.discount_set.last()
+        last_category_discount = self.category.discounts.last()
         if last_category_discount:
             return self.price - ((last_category_discount.discount / 100) * self.price)
         return self.price
+
+    # apply the best discount of all discounts (price_after_product_discount OR price_after_category_discount)
+    def discounted_price(self):
+        return min(self.price_after_product_discount(), self.price_after_category_discount())
 
     def has_discount(self):
         return self.price_after_product_discount() != self.price
 
     def main_image(self):
-        images = self.productimage_set.all()
+        images = self.images.all()
         if images.exists():
             return random.choice(images)
         return None
 
     def images(self):
-        return self.productimage_set.all()
+        return self.images.all()
 
     def number_of_ratings(self):
-        return self.rating_set.count()
+        return self.ratings.count()
 
     def average_rating(self):
-        ratings = self.rating_set.all()
+        ratings = self.ratings.all()
         if ratings.exists():
             return round(sum(rating.star_number for rating in ratings) / ratings.count(), 1)
         return 0.0
 
     def total_quantity(self):
-        return sum(availability.quantity for availability in self.productavailability_set.all())
+        return sum(availability.quantity for availability in self.availabilities.all())
 
     def available_colors(self):
-        return [availability.color.name for availability in self.productavailability_set.all()]
+        return [availability.color.name for availability in self.availabilities.all()]
 
     def available_sizes(self):
-        return [availability.size for availability in self.productavailability_set.all()]
+        return [availability.size for availability in self.availabilities.all()]
 
     def __str__(self):
         return self.name
 
 class ProductImage(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
-    image = models.FileField(upload_to='products/')
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='images'
+    )
+    image = models.ImageField(upload_to='product_images/')
 
     def __str__(self):
-        return self.image.name
+        return f"Image for {self.product.name}"
 
 class ProductInfo(models.Model):
     product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name='info')
@@ -125,26 +176,43 @@ class Color(models.Model):
         return self.name
 
 class ProductAvailability(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='availabilities')
-    size = models.CharField(choices=SIZES_CHOICES, max_length=50, default='s')
-    color = models.ForeignKey(Color, on_delete=models.CASCADE, related_name='availabilities')
-    quantity = models.IntegerField(default=0)
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='availabilities'
+    )
+    size = models.CharField(max_length=50)
+    color = models.ForeignKey(
+        Color,
+        on_delete=models.CASCADE
+    )
+    quantity = models.PositiveIntegerField()
 
     def __str__(self):
-        return f"{self.product.name} - {self.size} - {self.color.name} - {self.quantity}"
+        return f"{self.product.name} - {self.size} - {self.color.name}"
+
 
 class Rating(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ratings')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='ratings')
-    star_number = models.FloatField(default=5.0)
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='ratings'
+    )
+    user = models.ForeignKey(
+        User,  # Assuming you have a User model
+        on_delete=models.CASCADE
+    )
+    star_number = models.IntegerField()
     review = models.CharField(max_length=300, default="No review comment")
-    date_added = models.DateField(auto_now_add=True)
+    date_added = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.star_number} stars for {self.product.name} by {self.user.username}"
+
 
     def star_ranges(self):
         return range(int(self.star_number)), range(5 - int(self.star_number))
 
-    def __str__(self):
-        return f"{self.product.name} - {self.user.username}"
 
 class Shipping(models.Model):
     government = models.CharField(choices=GOVERNMENT_CHOICES, max_length=2)
@@ -153,69 +221,67 @@ class Shipping(models.Model):
     def __str__(self):
         return f"{self.get_government_display()} - {self.shipping_price}"
 
+
 class Pill(models.Model):
     items = models.ManyToManyField(Product, related_name='pills')
-    pill_discount = models.FloatField(default=0.0)
-    pill_coupon_discount = models.FloatField(default=0.0)
-    status = models.CharField(choices=PILL_STATUS_CHOICES, max_length=1, default='w')
+    status = models.CharField(choices=PILL_STATUS_CHOICES, max_length=1, default='i')
     date_added = models.DateTimeField(auto_now_add=True)
     paid = models.BooleanField(default=False)
+    coupon = models.ForeignKey('CouponDiscount', on_delete=models.SET_NULL, null=True, blank=True, related_name='pills')
+    coupon_discount = models.FloatField(default=0.0)  # Store the coupon discount as a field
+    pill_number = models.CharField(max_length=20, unique=True, editable=False, default=generate_pill_number)
 
     class Meta:
         verbose_name_plural = 'Bills'
 
     def __str__(self):
-        return f"{self.pilladdress.name} - {self.get_status_display()} - {self.date_added}"
+        return f"Pill ID: {self.id} - Status: {self.get_status_display()} - Date: {self.date_added}"
 
-    def get_pill_price(self):
-        pill_price = sum(item.price for item in self.items.all())
-        pill_price_after_discount = pill_price - (self.pill_discount / 100) * pill_price
-        shipping_price = Shipping.objects.get(government=self.pilladdress.government).shipping_price
-        pill_price_after_discount_and_shipping = pill_price_after_discount + shipping_price
-        pill_price_after_discount_and_shipping_and_coupon = pill_price_after_discount - (self.pill_coupon_discount / 100) * pill_price + shipping_price
+    # 1. Price without coupons (sum of product.discounted_price())
+    def price_without_coupons(self):
+        return sum(item.discounted_price() for item in self.items.all())
 
-        return (
-            pill_price,
-            pill_price_after_discount,
-            pill_price_after_discount_and_shipping,
-            pill_price_after_discount_and_shipping_and_coupon,
-            shipping_price
-        )
+    # 2. Calculate coupon discount (dynamically calculate based on the coupon)
+    def calculate_coupon_discount(self):
+        if self.coupon:
+            # Check if the coupon is valid (within start and end dates)
+            now = timezone.now()
+            if self.coupon.coupon_start <= now <= self.coupon.coupon_end:
+                return self.coupon.discount_value
+        return 0.0  # No coupon or invalid coupon
 
-    def pill_price(self):
-        return self.get_pill_price()[0]
+    # 3. Price after coupon discount
+    def price_after_coupon_discount(self):
+        return self.price_without_coupons() - self.coupon_discount
 
-    def pill_price_after_discount(self):
-        return self.get_pill_price()[1]
-
-    def pill_price_after_discount_and_shipping(self):
-        return self.get_pill_price()[2]
-
-    def pill_price_after_discount_and_shipping_and_coupon(self):
-        return self.get_pill_price()[3]
-
+    # 4. Shipping price (based on PillAddress.government)
     def shipping_price(self):
-        return self.get_pill_price()[4]
+        if hasattr(self, 'pilladdress'):
+            shipping = Shipping.objects.get(government=self.pilladdress.government)
+            return shipping.shipping_price
+        return 0.0  # Default shipping price if PillAddress is not set
+
+    # 5. Final price (price_after_coupon_discount + shipping_price)
+    def final_price(self):
+        return self.price_after_coupon_discount() + self.shipping_price()
+
 
 class Discount(models.Model):
-    discount = models.FloatField(null=True, blank=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True, related_name='discounts')
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, null=True, blank=True, related_name='discounts')
+    discount = models.FloatField()
     discount_start = models.DateTimeField()
     discount_end = models.DateTimeField()
-    comment = models.CharField(max_length=150, null=True, blank=True)
-    category = models.ForeignKey(Category, on_delete=models.CASCADE, null=True, blank=True, related_name='discounts')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True, related_name='discounts')
-
-    class Meta:
-        verbose_name_plural = 'Offers'
 
     def __str__(self):
-        return f"{self.category.name if self.category else self.product.name} - {self.discount}%"
+        return f"{self.discount}% discount"
 
 class CouponDiscount(models.Model):
     coupon = models.CharField(max_length=100, blank=True, null=True, editable=False)
     discount_value = models.FloatField(null=True, blank=True)
     coupon_start = models.DateTimeField(null=True, blank=True)
     coupon_end = models.DateTimeField(null=True, blank=True)
+    available_use_times = models.PositiveIntegerField(default=0)
 
     def save(self, *args, **kwargs):
         if not self.coupon:
@@ -232,7 +298,7 @@ class PillAddress(models.Model):
     phone = models.CharField(max_length=15, null=True, blank=True)
     address = models.CharField(max_length=255, null=True, blank=True)
     government = models.CharField(choices=GOVERNMENT_CHOICES, max_length=2)
-
+    pay_method = models.CharField(choices=PAYMENT_CHOICES, max_length=2 , default="c")
     def __str__(self):
         return f"{self.name} - {self.address}"
 
@@ -241,4 +307,8 @@ def create_random_coupon():
     nums = ['0', '2', '3', '4', '5', '6', '7', '8', '9']
     marks = ['@', '#', '$', '%', '&', '*']
     return '-'.join(random.choice(letters) + random.choice(nums) + random.choice(marks) for _ in range(5))
+
+
+
+
 
