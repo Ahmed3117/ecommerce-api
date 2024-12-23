@@ -195,32 +195,35 @@ class CustomerRatingDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsOwner]
 #^ < ==========================Dashboard endpoints========================== >
 
-
 class CategoryListCreateView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    permission_classes = [IsAdminUser] 
 
 class CategoryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    
+    permission_classes = [IsAdminUser] 
 
 class SubCategoryListCreateView(generics.ListCreateAPIView):
     queryset = SubCategory.objects.all()
     serializer_class = SubCategorySerializer
+    permission_classes = [IsAdminUser] 
 
 class SubCategoryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = SubCategory.objects.all()
     serializer_class = SubCategorySerializer
-
+    permission_classes = [IsAdminUser] 
 
 class BrandListCreateView(generics.ListCreateAPIView):
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
+    permission_classes = [IsAdminUser] 
 
 class BrandRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
+    permission_classes = [IsAdminUser] 
 
 class ProductListCreateView(generics.ListCreateAPIView):
     queryset = Product.objects.all()
@@ -228,67 +231,80 @@ class ProductListCreateView(generics.ListCreateAPIView):
     filter_backends = [DjangoFilterBackend, rest_filters.SearchFilter]
     filterset_class = ProductFilter
     search_fields = ['name', 'category__name', 'brand__name', 'description']
+    permission_classes = [IsAdminUser] 
 
 class ProductRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    permission_classes = [IsAdminUser] 
 
 class ProductImageListCreateView(generics.ListCreateAPIView):
     queryset = ProductImage.objects.all()
     serializer_class = ProductImageSerializer
     filterset_fields = ['product']
+    permission_classes = [IsAdminUser] 
 
 class ProductImageDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ProductImage.objects.all()
     serializer_class = ProductImageSerializer
+    permission_classes = [IsAdminUser] 
 
 class PillListCreateView(generics.ListCreateAPIView):
     queryset = Pill.objects.all()
     serializer_class = PillCreateSerializer
-    filterset_fields = ['status','paid','pill_number']
+    filterset_fields = ['status', 'paid', 'pill_number']
+    permission_classes = [IsAdminUser] 
 
 class PillRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Pill.objects.all()
     serializer_class = PillDetailSerializer
+    permission_classes = [IsAdminUser] 
 
 class CouponListCreateView(generics.ListCreateAPIView):
     queryset = CouponDiscount.objects.all()
     serializer_class = CouponDiscountSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = CouponDiscountFilter
+    permission_classes = [IsAdminUser] 
 
 class CouponRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = CouponDiscount.objects.all()
     serializer_class = CouponDiscountSerializer
+    permission_classes = [IsAdminUser] 
 
 class ShippingListCreateView(generics.ListCreateAPIView):
     queryset = Shipping.objects.all()
     serializer_class = ShippingSerializer
     filterset_fields = ['government']
+    permission_classes = [IsAdminUser] 
 
 class ShippingRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Shipping.objects.all()
     serializer_class = ShippingSerializer
+    permission_classes = [IsAdminUser] 
 
 class RatingListCreateView(generics.ListCreateAPIView):
     queryset = Rating.objects.all()
     serializer_class = RatingSerializer
     filterset_fields = ['product']
+    permission_classes = [IsAdminUser] 
 
 class RatingDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Rating.objects.all()
     serializer_class = RatingSerializer
+    permission_classes = [IsAdminUser] 
+
 class ProductAvailabilityListCreateView(generics.ListCreateAPIView):
     queryset = ProductAvailability.objects.all()
     serializer_class = ProductAvailabilitySerializer
-    # permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminUser] 
+    filter_backends = [DjangoFilterBackend]
     filterset_fields = ['product', 'color', 'size']
 
 class ProductAvailabilityDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ProductAvailability.objects.all()
     serializer_class = ProductAvailabilitySerializer
-    # permission_classes = [IsAdminUser]
-
+    permission_classes = [IsAdminUser] 
 
 
 
