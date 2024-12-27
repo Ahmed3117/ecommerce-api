@@ -20,7 +20,8 @@ class CategoryListView(generics.ListAPIView):
 class SubCategoryListView(generics.ListAPIView):
     queryset = SubCategory.objects.all()
     serializer_class = SubCategorySerializer
-    pagination_class = None
+    filter_backends = [DjangoFilterBackend] 
+    filterset_fields = ['category']
 
 class BrandListView(generics.ListAPIView):
     queryset = Brand.objects.all()
@@ -211,6 +212,8 @@ class CategoryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 class SubCategoryListCreateView(generics.ListCreateAPIView):
     queryset = SubCategory.objects.all()
     serializer_class = SubCategorySerializer
+    filter_backends = [DjangoFilterBackend] 
+    filterset_fields = ['category']
     permission_classes = [IsAdminUser] 
 
 class SubCategoryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):

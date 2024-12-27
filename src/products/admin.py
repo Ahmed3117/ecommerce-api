@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    Category, SubCategory, Brand, Product, ProductImage, ProductInfo,
+    Category, PillItem, SubCategory, Brand, Product, ProductImage, ProductInfo,
     Color, ProductAvailability, Rating, Shipping, Pill, Discount,
     CouponDiscount, PillAddress
 )
@@ -50,6 +50,11 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ('category', 'sub_category', 'brand', 'date_added')
     inlines = [ProductImageInline, ProductAvailabilityInline, RatingInline]
     readonly_fields = ('price_after_product_discount', 'price_after_category_discount', 'average_rating', 'total_quantity')
+
+    
+
+admin.site.register(PillItem)
+
 
 # ProductImage admin
 @admin.register(ProductImage)

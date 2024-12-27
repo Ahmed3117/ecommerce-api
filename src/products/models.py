@@ -114,9 +114,10 @@ class Product(models.Model):
         return self.price
 
     def price_after_category_discount(self):
-        last_category_discount = self.category.discounts.last()
-        if last_category_discount:
-            return self.price - ((last_category_discount.discount / 100) * self.price)
+        if self.category:  
+            last_category_discount = self.category.discounts.last()
+            if last_category_discount:
+                return self.price - ((last_category_discount.discount / 100) * self.price)
         return self.price
 
     # apply the best discount of all discounts (price_after_product_discount OR price_after_category_discount)

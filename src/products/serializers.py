@@ -2,15 +2,25 @@ from rest_framework import serializers
 from collections import defaultdict
 from .models import Category, CouponDiscount, PillAddress, PillItem, Shipping, SubCategory, Brand, Product, ProductImage, ProductAvailability, Rating, Color,Pill
 
-class CategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Category
-        fields = '__all__'
+
 
 class SubCategorySerializer(serializers.ModelSerializer):
+    category_name = serializers.SerializerMethodField()  # Add a field for the category name
+
     class Meta:
         model = SubCategory
-        fields = '__all__'
+        fields = ['id', 'name', 'category', 'category_name']  # Include category_name in the response
+
+    def get_category_name(self, obj):
+        # Return the name of the related category
+        return obj.category.name
+    
+class CategorySerializer(serializers.ModelSerializer):
+    subcategories = SubCategorySerializer(many=True, read_only=True)  # Nested subcategories
+
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'subcategories']
 
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:
