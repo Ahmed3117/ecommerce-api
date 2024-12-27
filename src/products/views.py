@@ -268,9 +268,15 @@ class ProductImageDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class PillListCreateView(generics.ListCreateAPIView):
     queryset = Pill.objects.all()
-    serializer_class = PillCreateSerializer
     filterset_fields = ['status', 'paid', 'pill_number']
-    permission_classes = [IsAdminUser] 
+    permission_classes = [IsAdminUser]
+
+    def get_serializer_class(self):
+        # Use PillCreateSerializer for POST (create) requests
+        if self.request.method == 'POST':
+            return PillCreateSerializer
+        # Use PillDetailSerializer for GET (list) requests
+        return PillDetailSerializer
 
 class PillRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Pill.objects.all()

@@ -199,7 +199,6 @@ class ProductAvailability(models.Model):
     def __str__(self):
         return f"{self.product.name} - {self.size} - {self.color.name}"
 
-
 class Rating(models.Model):
     product = models.ForeignKey(
         Product,
@@ -220,7 +219,6 @@ class Rating(models.Model):
 
     def star_ranges(self):
         return range(int(self.star_number)), range(5 - int(self.star_number))
-
 
 class Shipping(models.Model):
     government = models.CharField(choices=GOVERNMENT_CHOICES, max_length=2)
