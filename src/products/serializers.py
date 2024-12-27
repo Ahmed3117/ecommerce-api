@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Category, CouponDiscount, PillAddress, Shipping, SubCategory, Brand, Product, ProductImage, ProductAvailability, Rating, Color,Pill
+from collections import defaultdict
+from .models import Category, CouponDiscount, PillAddress, PillItem, Shipping, SubCategory, Brand, Product, ProductImage, ProductAvailability, Rating, Color,Pill
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -38,6 +39,13 @@ class ProductAvailabilitySerializer(serializers.ModelSerializer):
         representation['color'] = ColorSerializer(instance.color).data
         return representation
 
+
+class ProductAvailabilityBreifedSerializer(serializers.Serializer):
+    size = serializers.CharField()
+    color = serializers.CharField()
+    quantity = serializers.IntegerField()
+
+
 class RatingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Rating
@@ -58,8 +66,10 @@ class ProductImageSerializer(serializers.ModelSerializer):
         model = ProductImage
         fields = ['id', 'product', 'image']
 
+
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
+    availabilities = serializers.SerializerMethodField()
     discounted_price = serializers.SerializerMethodField()
     has_discount = serializers.SerializerMethodField()
     main_image = serializers.SerializerMethodField()
@@ -69,14 +79,58 @@ class ProductSerializer(serializers.ModelSerializer):
     available_colors = serializers.SerializerMethodField()
     available_sizes = serializers.SerializerMethodField()
 
+    # Add direct fields for category, sub_category, and brand
+    category_id = serializers.SerializerMethodField()
+    category_name = serializers.SerializerMethodField()
+    sub_category_id = serializers.SerializerMethodField()
+    sub_category_name = serializers.SerializerMethodField()
+    brand_id = serializers.SerializerMethodField()
+    brand_name = serializers.SerializerMethodField()
+
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'category', 'sub_category', 'brand', 'price', 'description', 'date_added',
-            'discounted_price',  'has_discount',
-            'main_image', 'images', 'number_of_ratings', 'average_rating', 'total_quantity',
-            'available_colors', 'available_sizes',
+            'id', 'name', 'category_id', 'category_name', 'sub_category_id', 'sub_category_name',
+            'brand_id', 'brand_name', 'price', 'description', 'date_added', 'discounted_price',
+            'has_discount', 'main_image', 'images', 'number_of_ratings', 'average_rating',
+            'total_quantity', 'available_colors', 'available_sizes', 'availabilities',
         ]
+
+    def get_category_id(self, obj):
+        return obj.category.id if obj.category else None
+
+    def get_category_name(self, obj):
+        return obj.category.name if obj.category else None
+
+    def get_sub_category_id(self, obj):
+        return obj.sub_category.id if obj.sub_category else None
+
+    def get_sub_category_name(self, obj):
+        return obj.sub_category.name if obj.sub_category else None
+
+    def get_brand_id(self, obj):
+        return obj.brand.id if obj.brand else None
+
+    def get_brand_name(self, obj):
+        return obj.brand.name if obj.brand else None
+
+    def get_availabilities(self, obj):
+        # Group availabilities by size and color, and sum the quantities
+        grouped_availabilities = defaultdict(int)
+        for availability in obj.availabilities.all():
+            key = (availability.size, availability.color.name if availability.color else None)
+            grouped_availabilities[key] += availability.quantity
+
+        # Convert the grouped data into the desired format
+        result = [
+            {
+                "size": size,
+                "color": color,
+                "quantity": quantity
+            }
+            for (size, color), quantity in grouped_availabilities.items()
+        ]
+        return result
 
     def get_discounted_price(self, obj):
         return obj.discounted_price()
@@ -101,12 +155,6 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def get_available_sizes(self, obj):
         return obj.available_sizes()
-
-class PillCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Pill
-        fields = ['id', 'items', 'status', 'date_added', 'paid', 'pill_number']
-        read_only_fields = ['status', 'date_added', 'paid', 'pill_number']
 
 class CouponCodeField(serializers.Field):
     """
@@ -162,11 +210,43 @@ class ShippingSerializer(serializers.ModelSerializer):
     def get_government_name(self, obj):
         return obj.get_government_display()
 
+class PillItemSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True)
+    color = ColorSerializer(read_only=True)
+
+    class Meta:
+        model = PillItem
+        fields = ['id', 'product', 'quantity', 'size', 'color']
+
+class PillItemCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PillItem
+        fields = ['product', 'quantity', 'size', 'color']
+        
+class PillCreateSerializer(serializers.ModelSerializer):
+    items = PillItemCreateSerializer(many=True)  # Nested serializer for PillItem
+
+    class Meta:
+        model = Pill
+        fields = ['id', 'user', 'items', 'status', 'date_added', 'paid']
+        read_only_fields = ['status', 'date_added', 'paid']
+
+    def create(self, validated_data):
+        # Extract the nested items data
+        items_data = validated_data.pop('items')
+        # Create the Pill instance
+        pill = Pill.objects.create(**validated_data)
+        # Create PillItem instances and add them to the Pill
+        for item_data in items_data:
+            pill_item = PillItem.objects.create(**item_data)  # Create PillItem without passing 'pill'
+            pill.items.add(pill_item)  # Associate the PillItem with the Pill
+        return pill
+
 class PillDetailSerializer(serializers.ModelSerializer):
-    items = ProductSerializer(many=True, read_only=True)  
-    coupon = CouponDiscountSerializer(read_only=True)  
-    pilladdress = PillAddressSerializer(read_only=True)  
-    shipping_price = serializers.SerializerMethodField()  
+    items = PillItemSerializer(many=True, read_only=True)  # Updated to use PillItemSerializer
+    coupon = CouponDiscountSerializer(read_only=True)
+    pilladdress = PillAddressSerializer(read_only=True)
+    shipping_price = serializers.SerializerMethodField()
     status_display = serializers.SerializerMethodField()
 
     class Meta:
@@ -174,9 +254,9 @@ class PillDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'items', 'status', 'status_display', 'date_added', 'paid', 'coupon', 'pilladdress',
             'price_without_coupons', 'coupon_discount', 'price_after_coupon_discount',
-            'shipping_price', 'final_price', 'pill_number'
+            'shipping_price', 'final_price'
         ]
-        read_only_fields = ['date_added', 'paid', 'price_without_coupons', 'coupon_discount', 'price_after_coupon_discount', 'shipping_price', 'final_price', 'pill_number']
+        read_only_fields = ['date_added', 'paid', 'price_without_coupons', 'coupon_discount', 'price_after_coupon_discount', 'shipping_price', 'final_price']
 
     def get_shipping_price(self, obj):
         """
@@ -186,7 +266,5 @@ class PillDetailSerializer(serializers.ModelSerializer):
 
     def get_status_display(self, obj):
         return obj.get_status_display()
-
-
 
 

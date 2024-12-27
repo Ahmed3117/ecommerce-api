@@ -4,6 +4,8 @@ from accounts.models import User
 from django.db import models
 from django.utils import timezone
 
+from core import settings
+
 GOVERNMENT_CHOICES = [
     ('1', 'Cairo'),
     ('2', 'Alexandria'),
@@ -61,19 +63,23 @@ PAYMENT_CHOICES = [
     ('v', 'visa'),
 ]
 
-
 def generate_pill_number():
     """Generate a unique 20-digit pill number."""
     while True:
         # Generate a random 20-digit string
         pill_number = ''.join(random.choices(string.digits, k=20))
-        # Check if the pill number is unique
-        if not Pill.objects.filter(pill_number=pill_number).exists():
-            return pill_number
+        return pill_number
+
+def create_random_coupon():
+    letters = string.ascii_lowercase
+    nums = ['0', '2', '3', '4', '5', '6', '7', '8', '9']
+    marks = ['@', '#', '$', '%', '&', '*']
+    return '-'.join(random.choice(letters) + random.choice(nums) + random.choice(marks) for _ in range(5))
 
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    image = models.ImageField(upload_to='categories/', null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -221,15 +227,29 @@ class Shipping(models.Model):
     def __str__(self):
         return f"{self.get_government_display()} - {self.shipping_price}"
 
+class PillItem(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='pill_items')
+    quantity = models.PositiveIntegerField(default=1)
+    size = models.CharField(max_length=10, choices=SIZES_CHOICES, null=True)
+    color = models.ForeignKey(Color, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.product.name} - {self.quantity} - {self.size} - {self.color.name if self.color else 'No Color'}"
 
 class Pill(models.Model):
-    items = models.ManyToManyField(Product, related_name='pills')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='pills')
+    items = models.ManyToManyField(PillItem, related_name='pills')  # Updated to relate to PillItem
     status = models.CharField(choices=PILL_STATUS_CHOICES, max_length=1, default='i')
     date_added = models.DateTimeField(auto_now_add=True)
     paid = models.BooleanField(default=False)
     coupon = models.ForeignKey('CouponDiscount', on_delete=models.SET_NULL, null=True, blank=True, related_name='pills')
     coupon_discount = models.FloatField(default=0.0)  # Store the coupon discount as a field
-    pill_number = models.CharField(max_length=20, unique=True, editable=False, default=generate_pill_number)
+    pill_number = models.CharField(max_length=20, editable=False)
+
+    def save(self, *args, **kwargs):
+        if not self.pill_number:
+            self.pill_number = generate_pill_number()
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name_plural = 'Bills'
@@ -237,9 +257,9 @@ class Pill(models.Model):
     def __str__(self):
         return f"Pill ID: {self.id} - Status: {self.get_status_display()} - Date: {self.date_added}"
 
-    # 1. Price without coupons (sum of product.discounted_price())
+    # 1. Price without coupons (sum of product.discounted_price() * quantity)
     def price_without_coupons(self):
-        return sum(item.discounted_price() for item in self.items.all())
+        return sum(item.product.discounted_price() * item.quantity for item in self.items.all())
 
     # 2. Calculate coupon discount (dynamically calculate based on the coupon)
     def calculate_coupon_discount(self):
@@ -264,7 +284,6 @@ class Pill(models.Model):
     # 5. Final price (price_after_coupon_discount + shipping_price)
     def final_price(self):
         return self.price_after_coupon_discount() + self.shipping_price()
-
 
 class Discount(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True, related_name='discounts')
@@ -302,11 +321,7 @@ class PillAddress(models.Model):
     def __str__(self):
         return f"{self.name} - {self.address}"
 
-def create_random_coupon():
-    letters = string.ascii_lowercase
-    nums = ['0', '2', '3', '4', '5', '6', '7', '8', '9']
-    marks = ['@', '#', '$', '%', '&', '*']
-    return '-'.join(random.choice(letters) + random.choice(nums) + random.choice(marks) for _ in range(5))
+
 
 
 

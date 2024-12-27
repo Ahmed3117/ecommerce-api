@@ -1,39 +1,5 @@
 from django.urls import path
-from .views import (
-    BrandListCreateView,
-    BrandRetrieveUpdateDestroyView,
-    CategoryListCreateView,
-    CategoryListView,
-    CategoryRetrieveUpdateDestroyView,
-    CouponListCreateView,
-    CouponRetrieveUpdateDestroyView,
-    CustomerRatingDetailView,
-    CustomerRatingListCreateView,
-    PillAddressCreateUpdateView,
-    PillCouponApplyView,
-    PillCreateView,
-    PillDetailView,
-    PillListCreateView,
-    PillRetrieveUpdateDestroyView,
-    ProductAvailabilityDetailView,
-    ProductAvailabilityListCreateView,
-    ProductImageDetailView,
-    ProductImageListCreateView,
-    ProductListCreateView,
-    ProductRetrieveUpdateDestroyView,
-    RatingDetailView,
-    RatingListCreateView,
-    ShippingListCreateView,
-    ShippingRetrieveUpdateDestroyView,
-    SubCategoryListCreateView,
-    SubCategoryListView,
-    BrandListView,
-    ProductListView,
-    Last10ProductsListView,
-    ProductDetailView,
-    SubCategoryRetrieveUpdateDestroyView,
-)
-
+from .views import *
 urlpatterns = [
     path('categories/', CategoryListView.as_view(), name='category-list'),
     path('subcategories/', SubCategoryListView.as_view(), name='subcategory-list'),
@@ -47,6 +13,8 @@ urlpatterns = [
     path('pills/<int:id>/', PillDetailView.as_view(), name='pill-detail'),
     path('ratings/', CustomerRatingListCreateView.as_view(), name='customer-rating-list-create'),
     path('ratings/<int:pk>/', CustomerRatingDetailView.as_view(), name='customer-rating-detail'),
+    path('user-pills/', UserPillsView.as_view(), name='user-pills'),
+    path('colors/', getColors.as_view(), name='colors'),
     #^ < ==========================dashboard urls========================== >
     path('dashboard/categories/', CategoryListCreateView.as_view(), name='category-list-create'),
     path('dashboard/categories/<int:pk>/', CategoryRetrieveUpdateDestroyView.as_view(), name='category-detail'),
@@ -54,6 +22,8 @@ urlpatterns = [
     path('dashboard/subcategories/<int:pk>/', SubCategoryRetrieveUpdateDestroyView.as_view(), name='subcategory-detail'),
     path('dashboard/brands/', BrandListCreateView.as_view(), name='brand-list-create'),
     path('dashboard/brands/<int:pk>/', BrandRetrieveUpdateDestroyView.as_view(), name='brand-detail'),
+    path('dashboard/colors/', ColorListCreateView.as_view(), name='color-list-create'),
+    path('dashboard/colors/<int:id>/', ColorRetrieveUpdateDestroyView.as_view(), name='color-retrieve-update-destroy'),
     path('dashboard/products/', ProductListCreateView.as_view(), name='product-list-create'),
     path('dashboard/products/<int:pk>/', ProductRetrieveUpdateDestroyView.as_view(), name='product-detail'),
     path('dashboard/product-images/', ProductImageListCreateView.as_view(), name='product-image-list-create'),
@@ -68,5 +38,7 @@ urlpatterns = [
     path('dashboard/ratings/<int:pk>/', RatingDetailView.as_view(), name='rating-detail'),
     path('dashboard/product-availabilities/', ProductAvailabilityListCreateView.as_view(), name='product-availability-list-create'),
     path('dashboard/product-availabilities/<int:pk>/', ProductAvailabilityDetailView.as_view(), name='product-availability-detail'),
+    path('dashboard/products/<int:product_id>/availabilities/', ProductAvailabilitiesView.as_view(), name='product-availabilities'),
+
 ]
 

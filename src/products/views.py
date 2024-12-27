@@ -2,26 +2,12 @@ from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework import filters as rest_filters  # Rename this import
 from django_filters.rest_framework import DjangoFilterBackend
-
+from collections import defaultdict
 from products.permissions import IsOwner
-from .models import Category, CouponDiscount, PillAddress, ProductAvailability, ProductImage, Rating, Shipping, SubCategory, Brand, Product,Pill
+from .models import Category, Color, CouponDiscount, PillAddress, ProductAvailability, ProductImage, Rating, Shipping, SubCategory, Brand, Product,Pill
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated,IsAdminUser
-from .serializers import (
-    CategorySerializer,
-    CouponDiscountSerializer,
-    PillAddressCreateSerializer,
-    PillCouponApplySerializer,
-    PillDetailSerializer,
-    ProductAvailabilitySerializer,
-    ProductImageSerializer,
-    RatingSerializer,
-    ShippingSerializer,
-    SubCategorySerializer,
-    BrandSerializer,
-    ProductSerializer,
-    PillCreateSerializer,
-)
+from .serializers import *
 from .filters import CouponDiscountFilter, ProductFilter
 
 #^ < ==========================customer endpoints========================== >
@@ -57,7 +43,7 @@ class Last10ProductsListView(generics.ListAPIView):
 class ProductDetailView(generics.RetrieveAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    lookup_field = 'id'  # Default is 'pk', but you can use 'id' if needed
+    lookup_field = 'id'
     
 class PillCreateView(generics.CreateAPIView):
     queryset = Pill.objects.all()
@@ -66,7 +52,7 @@ class PillCreateView(generics.CreateAPIView):
 class PillCouponApplyView(generics.UpdateAPIView):
     queryset = Pill.objects.all()
     serializer_class = PillCouponApplySerializer
-    lookup_field = 'id'
+    
 
     def perform_update(self, serializer):
         # Get the coupon instance from the validated data
@@ -179,7 +165,7 @@ class PillDetailView(generics.RetrieveAPIView):
     queryset = Pill.objects.all()
     serializer_class = PillDetailSerializer
     lookup_field = 'id'
-
+    
 class CustomerRatingListCreateView(generics.ListCreateAPIView):
     queryset = Rating.objects.all()
     serializer_class = RatingSerializer
@@ -193,6 +179,23 @@ class CustomerRatingDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Rating.objects.all()
     serializer_class = RatingSerializer
     permission_classes = [IsAuthenticated, IsOwner]
+    
+class UserPillsView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Get the authenticated user
+        user = request.user
+        # Retrieve all pills for the user
+        pills = Pill.objects.filter(user=user)
+        # Serialize the data
+        serializer = PillDetailSerializer(pills, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class getColors(generics.ListAPIView):
+    queryset = Color.objects.all()
+    serializer_class = ColorSerializer
+
 #^ < ==========================Dashboard endpoints========================== >
 
 class CategoryListCreateView(generics.ListCreateAPIView):
@@ -224,6 +227,17 @@ class BrandRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
     permission_classes = [IsAdminUser] 
+
+class ColorListCreateView(generics.ListCreateAPIView):
+    queryset = Color.objects.all()
+    serializer_class = ColorSerializer
+    permission_classes = [IsAdminUser] 
+
+class ColorRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Color.objects.all()
+    serializer_class = ColorSerializer
+    permission_classes = [IsAdminUser] 
+    lookup_field = 'id'
 
 class ProductListCreateView(generics.ListCreateAPIView):
     queryset = Product.objects.all()
@@ -306,6 +320,29 @@ class ProductAvailabilityDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ProductAvailabilitySerializer
     permission_classes = [IsAdminUser] 
 
+class ProductAvailabilitiesView(generics.ListAPIView):
+    def get(self, request, product_id):
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        # Group availabilities by size and color, and sum the quantities
+        grouped_availabilities = defaultdict(int)
+        for availability in product.availabilities.all():
+            key = (availability.size, availability.color.name if availability.color else None)
+            grouped_availabilities[key] += availability.quantity
 
+        # Convert the grouped data into the desired format
+        result = [
+            {
+                "size": size,
+                "color": color,
+                "quantity": quantity
+            }
+            for (size, color), quantity in grouped_availabilities.items()
+        ]
 
+        # Serialize the result
+        serializer = ProductAvailabilityBreifedSerializer(result, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
