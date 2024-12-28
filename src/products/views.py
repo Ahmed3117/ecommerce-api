@@ -53,7 +53,7 @@ class PillCreateView(generics.CreateAPIView):
 class PillCouponApplyView(generics.UpdateAPIView):
     queryset = Pill.objects.all()
     serializer_class = PillCouponApplySerializer
-    
+    lookup_field = 'id'
 
     def perform_update(self, serializer):
         # Get the coupon instance from the validated data
