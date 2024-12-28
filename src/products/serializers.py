@@ -39,10 +39,14 @@ class ColorSerializer(serializers.ModelSerializer):
 
 class ProductAvailabilitySerializer(serializers.ModelSerializer):
     color = serializers.PrimaryKeyRelatedField(queryset=Color.objects.all())
+    product_name = serializers.SerializerMethodField()  
 
     class Meta:
         model = ProductAvailability
-        fields = ['id', 'product', 'size', 'color', 'quantity']
+        fields = ['id', 'product', 'product_name', 'size', 'color', 'quantity']
+
+    def get_product_name(self, obj):
+        return obj.product.name
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -75,6 +79,14 @@ class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
         fields = ['id', 'product', 'image']
+
+
+class ProductImageBulkUploadSerializer(serializers.Serializer):
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    images = serializers.ListField(
+        child=serializers.ImageField(),  # Each item in the list is an ImageField
+        allow_empty=False,  # Ensure at least one image is provided
+    )
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -166,6 +178,11 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_available_sizes(self, obj):
         return obj.available_sizes()
 
+class ProductBreifedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = ['id', 'name']
+
 class CouponCodeField(serializers.Field):
     """
     Custom field to handle coupon code as a string and convert it to the CouponDiscount instance.
@@ -232,14 +249,22 @@ class PillItemCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PillItem
         fields = ['product', 'quantity', 'size', 'color']
-        
+
 class PillCreateSerializer(serializers.ModelSerializer):
     items = PillItemCreateSerializer(many=True)  # Nested serializer for PillItem
+    user_name = serializers.SerializerMethodField() 
+    user_username = serializers.SerializerMethodField()  
 
     class Meta:
         model = Pill
-        fields = ['id', 'user', 'items', 'status', 'date_added', 'paid']
+        fields = ['id', 'user', 'user_name', 'user_username', 'items', 'status', 'date_added', 'paid']
         read_only_fields = ['status', 'date_added', 'paid']
+
+    def get_user_name(self, obj):
+        return obj.user.name
+
+    def get_user_username(self, obj):
+        return obj.user.username
 
     def create(self, validated_data):
         # Extract the nested items data
@@ -258,16 +283,24 @@ class PillDetailSerializer(serializers.ModelSerializer):
     pilladdress = PillAddressSerializer(read_only=True)
     shipping_price = serializers.SerializerMethodField()
     status_display = serializers.SerializerMethodField()
+    user_name = serializers.SerializerMethodField() 
+    user_username = serializers.SerializerMethodField()
 
     class Meta:
         model = Pill
         fields = [
-            'id', 'items', 'status', 'status_display', 'date_added', 'paid', 'coupon', 'pilladdress',
+            'id', 'user_name', 'user_username', 'items', 'status', 'status_display', 'date_added', 'paid', 'coupon', 'pilladdress',
             'price_without_coupons', 'coupon_discount', 'price_after_coupon_discount',
             'shipping_price', 'final_price'
         ]
         read_only_fields = ['date_added', 'paid', 'price_without_coupons', 'coupon_discount', 'price_after_coupon_discount', 'shipping_price', 'final_price']
 
+    def get_user_name(self, obj):
+        return obj.user.name
+
+    def get_user_username(self, obj):
+        return obj.user.username
+    
     def get_shipping_price(self, obj):
         """
         Calculate the shipping price dynamically based on the PillAddress.

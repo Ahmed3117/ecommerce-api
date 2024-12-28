@@ -249,17 +249,50 @@ class ProductListCreateView(generics.ListCreateAPIView):
     filterset_class = ProductFilter
     search_fields = ['name', 'category__name', 'brand__name', 'description']
     permission_classes = [IsAdminUser] 
+class ProductListBreifedView(generics.ListCreateAPIView):
+    queryset = Product.objects.all()
+    serializer_class = ProductBreifedSerializer
+    filter_backends = [DjangoFilterBackend, rest_filters.SearchFilter]
+    filterset_class = ProductFilter
+    search_fields = ['name', 'category__name', 'brand__name', 'description']
+    permission_classes = [IsAdminUser] 
 
 class ProductRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     permission_classes = [IsAdminUser] 
 
+
 class ProductImageListCreateView(generics.ListCreateAPIView):
     queryset = ProductImage.objects.all()
     serializer_class = ProductImageSerializer
     filterset_fields = ['product']
     permission_classes = [IsAdminUser] 
+
+
+class ProductImageBulkCreateView(generics.CreateAPIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ProductImageBulkUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        product = serializer.validated_data['product']
+        images = serializer.validated_data['images']
+
+        # Save each image
+        product_images = [
+            ProductImage(product=product, image=image)
+            for image in images
+        ]
+        ProductImage.objects.bulk_create(product_images)
+
+        return Response(
+            {"message": "Images uploaded successfully."},
+            status=status.HTTP_201_CREATED,
+        )
+
+
 
 class ProductImageDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ProductImage.objects.all()
