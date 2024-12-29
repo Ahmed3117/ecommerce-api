@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from collections import defaultdict
+
+from accounts.models import User
 from .models import Category, CouponDiscount, PillAddress, PillItem, Shipping, SubCategory, Brand, Product, ProductImage, ProductAvailability, Rating, Color,Pill
 
 
@@ -254,6 +256,7 @@ class PillCreateSerializer(serializers.ModelSerializer):
     items = PillItemCreateSerializer(many=True)  # Nested serializer for PillItem
     user_name = serializers.SerializerMethodField() 
     user_username = serializers.SerializerMethodField()  
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False)  # Make user optional
 
     class Meta:
         model = Pill
@@ -276,7 +279,10 @@ class PillCreateSerializer(serializers.ModelSerializer):
             pill_item = PillItem.objects.create(**item_data)  # Create PillItem without passing 'pill'
             pill.items.add(pill_item)  # Associate the PillItem with the Pill
         return pill
-
+    
+    
+    
+    
 class PillDetailSerializer(serializers.ModelSerializer):
     items = PillItemSerializer(many=True, read_only=True)  # Updated to use PillItemSerializer
     coupon = CouponDiscountSerializer(read_only=True)

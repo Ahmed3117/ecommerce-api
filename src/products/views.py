@@ -49,6 +49,13 @@ class ProductDetailView(generics.RetrieveAPIView):
 class PillCreateView(generics.CreateAPIView):
     queryset = Pill.objects.all()
     serializer_class = PillCreateSerializer
+    permission_classes = [IsAuthenticated]  # Ensure the user is authenticated
+
+    def perform_create(self, serializer):
+        # If 'user' is not in the request data, set it to the request.user
+        if 'user' not in serializer.validated_data:
+            serializer.validated_data['user'] = self.request.user
+        serializer.save()
 
 class PillCouponApplyView(generics.UpdateAPIView):
     queryset = Pill.objects.all()
@@ -372,19 +379,30 @@ class ProductAvailabilitiesView(generics.ListAPIView):
         # Group availabilities by size and color, and sum the quantities
         grouped_availabilities = defaultdict(int)
         for availability in product.availabilities.all():
-            key = (availability.size, availability.color.name if availability.color else None)
+            color_id = availability.color.id if availability.color else None
+            color_name = availability.color.name if availability.color else None
+            key = (availability.size, color_id, color_name)
             grouped_availabilities[key] += availability.quantity
 
         # Convert the grouped data into the desired format
         result = [
             {
                 "size": size,
-                "color": color,
+                "color": {
+                    "id": color_id,
+                    "name": color_name
+                },
                 "quantity": quantity
             }
-            for (size, color), quantity in grouped_availabilities.items()
+            for (size, color_id, color_name), quantity in grouped_availabilities.items()
         ]
 
         # Serialize the result
         serializer = ProductAvailabilityBreifedSerializer(result, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    
+    
+    
+    
+    
