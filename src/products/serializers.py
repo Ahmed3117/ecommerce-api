@@ -234,7 +234,7 @@ class ShippingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Shipping
-        fields = ['government', 'government_name', 'shipping_price']
+        fields = ['id','government', 'government_name', 'shipping_price']
 
     def get_government_name(self, obj):
         return obj.get_government_display()

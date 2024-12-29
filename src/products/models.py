@@ -277,7 +277,7 @@ class Pill(models.Model):
     # 4. Shipping price (based on PillAddress.government)
     def shipping_price(self):
         if hasattr(self, 'pilladdress'):
-            shipping = Shipping.objects.get(government=self.pilladdress.government)
+            shipping = Shipping.objects.filter(government=self.pilladdress.government).first()
             return shipping.shipping_price
         return 0.0  # Default shipping price if PillAddress is not set
 
@@ -313,7 +313,7 @@ class CouponDiscount(models.Model):
 class PillAddress(models.Model):
     pill = models.OneToOneField(Pill, on_delete=models.CASCADE, related_name='pilladdress')
     name = models.CharField(max_length=150, null=True, blank=True)
-    email = models.EmailField(unique=True, null=True, blank=True)
+    email = models.EmailField( null=True, blank=True)
     phone = models.CharField(max_length=15, null=True, blank=True)
     address = models.CharField(max_length=255, null=True, blank=True)
     government = models.CharField(choices=GOVERNMENT_CHOICES, max_length=2)
