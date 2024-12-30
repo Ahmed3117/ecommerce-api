@@ -102,6 +102,8 @@ class ProductImageBulkUploadSerializer(serializers.Serializer):
     )
 
 
+from collections import defaultdict
+
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     availabilities = serializers.SerializerMethodField()
@@ -153,17 +155,18 @@ class ProductSerializer(serializers.ModelSerializer):
         # Group availabilities by size and color, and sum the quantities
         grouped_availabilities = defaultdict(int)
         for availability in obj.availabilities.all():
-            key = (availability.size, availability.color.name if availability.color else None)
+            key = (availability.size, availability.color.id if availability.color else None, availability.color.name if availability.color else None)
             grouped_availabilities[key] += availability.quantity
 
         # Convert the grouped data into the desired format
         result = [
             {
                 "size": size,
-                "color": color,
+                "color_id": color_id,  # Include color_id
+                "color": color_name,   # Include color name
                 "quantity": quantity
             }
-            for (size, color), quantity in grouped_availabilities.items()
+            for (size, color_id, color_name), quantity in grouped_availabilities.items()
         ]
         return result
 

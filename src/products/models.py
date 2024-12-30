@@ -149,7 +149,12 @@ class Product(models.Model):
         return sum(availability.quantity for availability in self.availabilities.all())
 
     def available_colors(self):
-        return [availability.color.name for availability in self.availabilities.all()]
+        colors = set()
+        for availability in self.availabilities.all():
+            if availability.color:
+                colors.add((availability.color.id, availability.color.name))
+        # Convert the set to a list of dictionaries
+        return [{"color_id": color_id, "color_name": color_name} for color_id, color_name in colors]
 
     def available_sizes(self):
         return [availability.size for availability in self.availabilities.all()]
