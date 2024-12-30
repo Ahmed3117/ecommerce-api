@@ -308,7 +308,11 @@ class ProductImageDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class PillListCreateView(generics.ListCreateAPIView):
     queryset = Pill.objects.all()
-    filterset_fields = ['status', 'paid', 'pill_number']
+    serializer_class = PillCreateSerializer  # Use the appropriate serializer
+    filter_backends = [DjangoFilterBackend, rest_filters.SearchFilter]  # Add filter backends
+    filterset_fields = ['status', 'paid', 'pill_number','pilladdress__government', 'pilladdress__pay_method','pilladdress__name', 'user__name', 'user__username']
+    search_fields = ['pilladdress__phone', 'pilladdress__government'
+    ]
     permission_classes = [IsAdminUser]
 
     def get_serializer_class(self):

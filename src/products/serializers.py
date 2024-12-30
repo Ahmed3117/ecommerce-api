@@ -40,8 +40,16 @@ class ColorSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ProductAvailabilitySerializer(serializers.ModelSerializer):
-    color = serializers.PrimaryKeyRelatedField(queryset=Color.objects.all())
-    product_name = serializers.SerializerMethodField()  
+    color = serializers.PrimaryKeyRelatedField(
+        queryset=Color.objects.all(),
+        allow_null=True,  # Allow null values
+        required=False    # Make the field optional
+    )
+    size = serializers.CharField(
+        allow_null=True,  # Allow null values
+        required=False    # Make the field optional
+    )
+    product_name = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductAvailability
@@ -52,9 +60,12 @@ class ProductAvailabilitySerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        representation['color'] = ColorSerializer(instance.color).data
+        # Only serialize color if it exists
+        if instance.color:
+            representation['color'] = ColorSerializer(instance.color).data
+        else:
+            representation['color'] = None  # Explicitly set color to null if it doesn't exist
         return representation
-
 
 class ProductAvailabilityBreifedSerializer(serializers.Serializer):
     size = serializers.CharField()

@@ -189,15 +189,16 @@ class ProductAvailability(models.Model):
         on_delete=models.CASCADE,
         related_name='availabilities'
     )
-    size = models.CharField(max_length=50)
+    size = models.CharField(max_length=50, null=True, blank=True)  
     color = models.ForeignKey(
         Color,
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        null=True, blank=True  
     )
     quantity = models.PositiveIntegerField()
 
     def __str__(self):
-        return f"{self.product.name} - {self.size} - {self.color.name}"
+        return f"{self.product.name} - {self.size} - {self.color.name if self.color else 'No Color'}"
 
 class Rating(models.Model):
     product = models.ForeignKey(
