@@ -283,8 +283,11 @@ class Pill(models.Model):
     # 4. Shipping price (based on PillAddress.government)
     def shipping_price(self):
         if hasattr(self, 'pilladdress'):
-            shipping = Shipping.objects.filter(government=self.pilladdress.government).first()
-            return shipping.shipping_price
+            try:
+                shipping = Shipping.objects.filter(government=self.pilladdress.government).first()
+                return shipping.shipping_price
+            except Shipping.DoesNotExist:
+                return 0.0
         return 0.0  # Default shipping price if PillAddress is not set
 
     # 5. Final price (price_after_coupon_discount + shipping_price)
