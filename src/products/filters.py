@@ -1,7 +1,7 @@
 
-from .models import Product
+from .models import Product, ProductImage
 from django_filters import rest_framework as filters
-from django.db.models import Q, F, FloatField, Case, When
+from django.db.models import Q, F, FloatField, Case, When,Exists, OuterRef
 from django.utils import timezone
 from .models import Product, CouponDiscount
 
@@ -10,10 +10,11 @@ class ProductFilter(filters.FilterSet):
     price_max = filters.NumberFilter(method='filter_by_discounted_price_max')
     color = filters.CharFilter(method='filter_by_color')
     size = filters.CharFilter(method='filter_by_size')
+    has_images = filters.BooleanFilter(method='filter_has_images')
 
     class Meta:
         model = Product
-        fields = ['category', 'sub_category', 'brand']
+        fields = ['category', 'sub_category', 'brand', 'has_images']
 
     def filter_by_discounted_price_min(self, queryset, name, value):
         now = timezone.now()
@@ -93,6 +94,14 @@ class ProductFilter(filters.FilterSet):
     def filter_by_size(self, queryset, name, value):
         return queryset.filter(availabilities__size__iexact=value).distinct()
 
+    def filter_has_images(self, queryset, name, value):
+        if value:
+            # Filter products that have at least one related image
+            return queryset.filter(Exists(ProductImage.objects.filter(product=OuterRef('pk'))))
+        else:
+            # Filter products that do not have any related images
+            return queryset.filter(~Exists(ProductImage.objects.filter(product=OuterRef('pk'))))
+    
 class CouponDiscountFilter(filters.FilterSet):
     available = filters.BooleanFilter(method='filter_available')
 

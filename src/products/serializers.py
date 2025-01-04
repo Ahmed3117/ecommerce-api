@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from collections import defaultdict
-
 from accounts.models import User
 from .models import Category, CouponDiscount, PillAddress, PillItem, Shipping, SubCategory, Brand, Product, ProductImage, ProductAvailability, Rating, Color,Pill
 
@@ -93,16 +92,12 @@ class ProductImageSerializer(serializers.ModelSerializer):
         model = ProductImage
         fields = ['id', 'product', 'image']
 
-
 class ProductImageBulkUploadSerializer(serializers.Serializer):
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
     images = serializers.ListField(
         child=serializers.ImageField(),  # Each item in the list is an ImageField
         allow_empty=False,  # Ensure at least one image is provided
     )
-
-
-from collections import defaultdict
 
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
