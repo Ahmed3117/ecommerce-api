@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from collections import defaultdict
+from urllib.parse import urljoin
 from accounts.models import User
 from .models import Category, CouponDiscount, PillAddress, PillItem, Shipping, SubCategory, Brand, Product, ProductImage, ProductAvailability, Rating, Color,Pill
 
@@ -172,7 +173,15 @@ class ProductSerializer(serializers.ModelSerializer):
         return obj.has_discount()
 
     def get_main_image(self, obj):
-        return obj.main_image().image.url if obj.main_image() else None
+        main_image = obj.main_image()
+        if main_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(main_image.image.url)
+            else:
+                base_url = "http://your_domain.com"
+                return urljoin(base_url, main_image.image.url)
+        return None
 
     def get_number_of_ratings(self, obj):
         return obj.number_of_ratings()

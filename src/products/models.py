@@ -157,7 +157,7 @@ class Product(models.Model):
         return [{"color_id": color_id, "color_name": color_name} for color_id, color_name in colors]
 
     def available_sizes(self):
-        return [availability.size for availability in self.availabilities.all()]
+        return [availability.size for availability in self.availabilities.all() if availability.size is not None]
 
     def __str__(self):
         return self.name
