@@ -10,6 +10,9 @@ urlpatterns = [
     path('password-reset/', views.request_password_reset, name='password_reset'),
     path('password-reset/confirm/', views.reset_password_confirm, name='password_reset_confirm'),
     path('update-profile/', views.UpdateUserProfile.as_view(), name='update-profile'),
-    path('create-admin-user/', views.create_admin_user, name='create-admin-user'),
     path('get-profile/', views.GetUserProfile.as_view(), name='get-profile'),
+    #-----------------Admin--------------------------#
+    path('create-admin-user/', views.create_admin_user, name='create-admin-user'),
+    path('users/', views.UserListView.as_view(), name='user-list-create'),
+    path('users/<int:pk>/', views.UserRetrieveUpdateDestroyView.as_view(), name='user-retrieve-update-destroy'),
 ]

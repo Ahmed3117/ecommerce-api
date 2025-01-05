@@ -8,3 +8,4 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.name if self.name else self.username
+
