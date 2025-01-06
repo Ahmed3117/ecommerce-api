@@ -1,5 +1,5 @@
 
-from .models import Product, ProductImage
+from .models import Category, Pill, Product, ProductImage
 from django_filters import rest_framework as filters
 from django.db.models import Q, F, FloatField, Case, When,Exists, OuterRef
 from django.utils import timezone
@@ -118,3 +118,32 @@ class CouponDiscountFilter(filters.FilterSet):
                 coupon_end__gte=now
             )
         return queryset
+
+class CategoryFilter(filters.FilterSet):
+    has_image = filters.BooleanFilter(method='filter_has_image')
+
+    class Meta:
+        model = Category
+        fields = ['has_image']
+
+    def filter_has_image(self, queryset, name, value):
+        if value:
+            # Filter categories that have an image
+            return queryset.filter(~Q(image__isnull=True) & ~Q(image__exact=''))
+        else:
+            # Filter categories that do not have an image
+            return queryset.filter(Q(image__isnull=True) | Q(image__exact=''))
+        
+class PillFilter(filters.FilterSet):
+    # Add a date range filter for the `date_added` field
+    start_date = filters.DateFilter(field_name='date_added', lookup_expr='gte', label='Start Date')
+    end_date = filters.DateFilter(field_name='date_added', lookup_expr='lte', label='End Date')
+
+    class Meta:
+        model = Pill
+        fields = ['status', 'paid', 'pill_number', 'pilladdress__government', 'pilladdress__pay_method']
+        
+        
+        
+        
+        

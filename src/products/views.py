@@ -8,14 +8,16 @@ from .models import Category, Color, CouponDiscount, PillAddress, ProductAvailab
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from .serializers import *
-from .filters import CouponDiscountFilter, ProductFilter
+from .filters import CategoryFilter, CouponDiscountFilter, PillFilter, ProductFilter
 
 #^ < ==========================customer endpoints========================== >
 
 class CategoryListView(generics.ListAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    pagination_class = None  # Optional: Disable pagination if not needed
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = CategoryFilter 
+    
 
 class SubCategoryListView(generics.ListAPIView):
     queryset = SubCategory.objects.all()
@@ -37,6 +39,7 @@ class ProductListView(generics.ListAPIView):
 
 class Last10ProductsListView(generics.ListAPIView):
     serializer_class = ProductSerializer
+    filterset_class = ProductFilter
 
     def get_queryset(self):
         return Product.objects.all().order_by('-date_added')[:10]
@@ -209,6 +212,8 @@ class getColors(generics.ListAPIView):
 class CategoryListCreateView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = CategoryFilter 
     permission_classes = [IsAdminUser] 
 
 class CategoryRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
@@ -308,10 +313,10 @@ class ProductImageDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class PillListCreateView(generics.ListCreateAPIView):
     queryset = Pill.objects.all()
-    serializer_class = PillCreateSerializer  # Use the appropriate serializer
-    filter_backends = [DjangoFilterBackend, rest_filters.SearchFilter]  # Add filter backends
-    filterset_fields = ['status', 'paid', 'pill_number','pilladdress__government', 'pilladdress__pay_method']
-    search_fields = ['pilladdress__phone', 'pilladdress__government','pilladdress__name', 'user__name', 'user__username']
+    serializer_class = PillCreateSerializer
+    filter_backends = [DjangoFilterBackend, rest_filters.SearchFilter]
+    filterset_class = PillFilter  
+    search_fields = ['pilladdress__phone', 'pilladdress__government', 'pilladdress__name', 'user__name', 'user__username']
     permission_classes = [IsAdminUser]
 
     def get_serializer_class(self):

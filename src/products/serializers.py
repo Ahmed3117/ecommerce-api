@@ -179,7 +179,7 @@ class ProductSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(main_image.image.url)
             else:
-                base_url = "http://your_domain.com"
+                base_url = ""
                 return urljoin(base_url, main_image.image.url)
         return None
 
