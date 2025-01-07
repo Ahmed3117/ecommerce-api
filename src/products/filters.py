@@ -101,6 +101,19 @@ class ProductFilter(filters.FilterSet):
         else:
             # Filter products that do not have any related images
             return queryset.filter(~Exists(ProductImage.objects.filter(product=OuterRef('pk'))))
+
+    def filter_queryset(self, queryset):
+        # Apply the filters first
+        queryset = super().filter_queryset(queryset)
+        # Get the `limit` parameter from the query string (default to 10 if not provided)
+        limit = int(self.request.query_params.get('limit', 10))
+        # Order by `date_added` and slice the queryset
+        return queryset.order_by('-date_added')[:limit]
+    
+    
+    
+    
+    
     
 class CouponDiscountFilter(filters.FilterSet):
     available = filters.BooleanFilter(method='filter_available')

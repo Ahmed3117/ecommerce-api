@@ -37,12 +37,13 @@ class ProductListView(generics.ListAPIView):
     filterset_class = ProductFilter
     search_fields = ['name', 'category__name', 'brand__name', 'description']
 
+
 class Last10ProductsListView(generics.ListAPIView):
+    queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    filter_backends = [DjangoFilterBackend, rest_filters.SearchFilter]
     filterset_class = ProductFilter
 
-    def get_queryset(self):
-        return Product.objects.all().order_by('-date_added')[:10]
 
 class ProductDetailView(generics.RetrieveAPIView):
     queryset = Product.objects.all()
