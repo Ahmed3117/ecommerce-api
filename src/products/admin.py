@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    Category, PillItem, SubCategory, Brand, Product, ProductImage, ProductInfo,
+    Category, PillItem, ProductSales, SubCategory, Brand, Product, ProductImage, 
     Color, ProductAvailability, Rating, Shipping, Pill, Discount,
     CouponDiscount, PillAddress
 )
@@ -56,16 +56,19 @@ class ProductAdmin(admin.ModelAdmin):
 admin.site.register(PillItem)
 
 
+
+@admin.register(ProductSales)
+class ProductSalesAdmin(admin.ModelAdmin):
+    list_display = ('product', 'quantity', 'size', 'color', 'price_at_sale', 'date_sold', 'pill')
+    list_filter = ('date_sold', 'size', 'color')
+    search_fields = ('product__name', 'pill__pill_number')
+    date_hierarchy = 'date_sold'
+    readonly_fields = ('date_sold',)
+
 # ProductImage admin
 @admin.register(ProductImage)
 class ProductImageAdmin(admin.ModelAdmin):
     list_display = ('product', 'image')
-    search_fields = ('product__name',)
-
-# ProductInfo admin
-@admin.register(ProductInfo)
-class ProductInfoAdmin(admin.ModelAdmin):
-    list_display = ('product', 'num_of_sales')
     search_fields = ('product__name',)
 
 # Color admin

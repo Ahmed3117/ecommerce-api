@@ -3,6 +3,7 @@ import string
 from accounts.models import User
 from django.db import models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 from core import settings
 
@@ -173,14 +174,6 @@ class ProductImage(models.Model):
     def __str__(self):
         return f"Image for {self.product.name}"
 
-class ProductInfo(models.Model):
-    product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name='info')
-    num_of_sales = models.IntegerField(default=0)
-    # rate = models.FloatField(default=0.0)
-
-    def __str__(self):
-        return f"{self.product.name} - Info"
-
 class Color(models.Model):
     name = models.CharField(max_length=50, unique=True)
     degree = models.CharField(max_length=50)
@@ -201,9 +194,23 @@ class ProductAvailability(models.Model):
         null=True, blank=True  
     )
     quantity = models.PositiveIntegerField()
+    date_added = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.product.name} - {self.size} - {self.color.name if self.color else 'No Color'}"
+
+class ProductSales(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='sales')
+    quantity = models.PositiveIntegerField()
+    size = models.CharField(max_length=50, null=True, blank=True)
+    color = models.ForeignKey(Color, on_delete=models.CASCADE, null=True, blank=True)
+    price_at_sale = models.FloatField()  
+    date_sold = models.DateTimeField(auto_now_add=True)
+    pill = models.ForeignKey('Pill', on_delete=models.CASCADE, related_name='product_sales')
+
+    def __str__(self):
+        return f"{self.product.name} - {self.quantity} sold on {self.date_sold}"
+
 
 class Rating(models.Model):
     product = models.ForeignKey(
@@ -255,6 +262,42 @@ class Pill(models.Model):
     def save(self, *args, **kwargs):
         if not self.pill_number:
             self.pill_number = generate_pill_number()
+        
+        # Check if status changed to 'd' (delivered)
+        if self.pk:  # If pill already exists
+            old_pill = Pill.objects.get(pk=self.pk)
+            if old_pill.status != 'd' and self.status == 'd':
+                # Process each item in the pill
+                for item in self.items.all():
+                    # Create sales record
+                    ProductSales.objects.create(
+                        product=item.product,
+                        quantity=item.quantity,
+                        size=item.size,
+                        color=item.color,
+                        price_at_sale=item.product.discounted_price(),
+                        pill=self
+                    )
+                    
+                    # Decrease product availability
+                    try:
+                        # Find matching availability
+                        availability = ProductAvailability.objects.get(
+                            product=item.product,
+                            size=item.size,
+                            color=item.color
+                        )
+                        
+                        # Check if enough quantity is available
+                        if availability.quantity >= item.quantity:
+                            availability.quantity -= item.quantity
+                            availability.save()
+                        else:
+                            raise ValidationError(f"Not enough inventory for {item.product.name}")
+                            
+                    except ProductAvailability.DoesNotExist:
+                        raise ValidationError(f"No matching availability found for {item.product.name}")
+        
         super().save(*args, **kwargs)
 
     class Meta:
