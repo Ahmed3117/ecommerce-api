@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    Category, PillItem, ProductSales, SubCategory, Brand, Product, ProductImage, 
+    Category, PayRequest, PillItem, ProductSales, SubCategory, Brand, Product, ProductImage, 
     Color, ProductAvailability, Rating, Shipping, Pill, Discount,
     CouponDiscount, PillAddress
 )
@@ -159,3 +159,10 @@ class CouponDiscountAdmin(admin.ModelAdmin):
 class PillAddressAdmin(admin.ModelAdmin):
     list_display = ('name', 'email', 'phone', 'address', 'government')
     search_fields = ('name', 'email', 'address')
+
+
+@admin.register(PayRequest)
+class PayRequestAdmin(admin.ModelAdmin):
+    list_display = ['pill', 'date', 'is_applied']
+    list_filter = ['is_applied']
+    search_fields = ['pill__pill_number', 'pill__user__name', 'pill__pilladdress__email', 'pill__pilladdress__phone']

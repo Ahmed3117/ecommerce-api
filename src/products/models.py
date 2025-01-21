@@ -4,7 +4,7 @@ from accounts.models import User
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
-
+from products.utils import send_whatsapp_message
 from core import settings
 
 GOVERNMENT_CHOICES = [
@@ -37,10 +37,10 @@ GOVERNMENT_CHOICES = [
     ('27', 'South Sinai'),
 ]
 
-
 PILL_STATUS_CHOICES = [
     ('i', 'initiated'),
     ('w', 'Waiting'),
+    ('p', 'Paid'),
     ('u', 'Under Delivery'),
     ('d', 'Delivered'),
     ('r', 'Refused'),
@@ -76,7 +76,6 @@ def create_random_coupon():
     nums = ['0', '2', '3', '4', '5', '6', '7', '8', '9']
     marks = ['@', '#', '$', '%', '&', '*']
     return '-'.join(random.choice(letters) + random.choice(nums) + random.choice(marks) for _ in range(5))
-
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -211,7 +210,6 @@ class ProductSales(models.Model):
     def __str__(self):
         return f"{self.product.name} - {self.quantity} sold on {self.date_sold}"
 
-
 class Rating(models.Model):
     product = models.ForeignKey(
         Product,
@@ -250,7 +248,7 @@ class PillItem(models.Model):
         return f"{self.product.name} - {self.quantity} - {self.size} - {self.color.name if self.color else 'No Color'}"
 
 class Pill(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='pills')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='pills')
     items = models.ManyToManyField(PillItem, related_name='pills')  # Updated to relate to PillItem
     status = models.CharField(choices=PILL_STATUS_CHOICES, max_length=1, default='i')
     date_added = models.DateTimeField(auto_now_add=True)
@@ -263,9 +261,19 @@ class Pill(models.Model):
         if not self.pill_number:
             self.pill_number = generate_pill_number()
         
-        # Check if status changed to 'd' (delivered)
-        if self.pk:  # If pill already exists
+        # Log the initial status if the pill is being created
+        if not self.pk:
+            super().save(*args, **kwargs)
+            PillStatusLog.objects.create(pill=self, status=self.status)
+        else:
+            # Check if status changed
             old_pill = Pill.objects.get(pk=self.pk)
+            if old_pill.status != self.status:
+                # Log the status change or update the existing log
+                status_log, created = PillStatusLog.objects.get_or_create(pill=self, status=self.status)
+                if not created:
+                    status_log.changed_at = timezone.now()
+                    status_log.save()
             if old_pill.status != 'd' and self.status == 'd':
                 # Process each item in the pill
                 for item in self.items.all():
@@ -298,6 +306,14 @@ class Pill(models.Model):
                     except ProductAvailability.DoesNotExist:
                         raise ValidationError(f"No matching availability found for {item.product.name}")
         
+        # Update status to 'p' (Paid) if self.paid becomes True
+        if self.paid:
+            print("Pill is paid")
+            self.status = 'p'
+            # Send WhatsApp message when the pill is paid
+            if hasattr(self, 'pilladdress') and self.pilladdress.phone:
+                prepare_whatsapp_message(self.pilladdress.phone, self)
+
         super().save(*args, **kwargs)
 
     class Meta:
@@ -373,9 +389,35 @@ class PillAddress(models.Model):
     def __str__(self):
         return f"{self.name} - {self.address}"
 
+class PillStatusLog(models.Model):
+    pill = models.ForeignKey(Pill, on_delete=models.CASCADE, related_name='status_logs')
+    status = models.CharField(choices=PILL_STATUS_CHOICES, max_length=1)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.pill.id} - {self.get_status_display()} at {self.changed_at}"
+
+class PayRequest(models.Model):
+    pill = models.ForeignKey('Pill', on_delete=models.CASCADE, related_name='pay_requests')
+    image = models.ImageField(upload_to='pay_requests/')
+    date = models.DateTimeField(auto_now_add=True)
+    is_applied = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"PayRequest for Pill {self.pill.id} - Applied: {self.is_applied}"
 
 
+def prepare_whatsapp_message(phone_number, pill):
+    print(f"Preparing WhatsApp message for phone number: {phone_number}")
+    # Prepare the WhatsApp message
+    message = (
+        f"مرحباً {pill.user.username}،\n\n"
+        f"تم استلام طلبك بنجاح.\n\n"
+        f"رقم الطلب: {pill.pill_number}\n"
+    )
 
-
-
-
+    # Send WhatsApp message
+    send_whatsapp_message(
+        phone_number=phone_number,
+        message=message
+    )

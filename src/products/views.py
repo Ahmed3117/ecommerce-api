@@ -7,8 +7,11 @@ from products.permissions import IsOwner
 from .models import Category, Color, CouponDiscount, PillAddress, ProductAvailability, ProductImage, Rating, Shipping, SubCategory, Brand, Product,Pill
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated,IsAdminUser
+from rest_framework.parsers import MultiPartParser, FormParser
 from .serializers import *
 from .filters import CategoryFilter, CouponDiscountFilter, PillFilter, ProductFilter
+from .models import prepare_whatsapp_message
+
 
 #^ < ==========================customer endpoints========================== >
 
@@ -207,6 +210,28 @@ class UserPillsView(generics.ListAPIView):
 class getColors(generics.ListAPIView):
     queryset = Color.objects.all()
     serializer_class = ColorSerializer
+
+
+class PayRequestListCreateView(generics.ListCreateAPIView):
+    queryset = PayRequest.objects.all()
+    serializer_class = PayRequestSerializer
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]  # To handle file uploads
+    filter_backends = [DjangoFilterBackend, rest_filters.SearchFilter]
+    filterset_fields = ['is_applied', 'pill__pill_number', 'pill__user__name', 'pill__pilladdress__email', 'pill__pilladdress__phone', 'pill__pilladdress__government']
+    search_fields = ['pill__pill_number', 'pill__user__name', 'pill__pilladdress__email', 'pill__pilladdress__phone', 'pill__pilladdress__government']
+
+    def perform_create(self, serializer):
+        # Ensure the user is the owner of the pill
+        pill_id = self.request.data.get('pill')
+        try:
+            pill = Pill.objects.get(id=pill_id, user=self.request.user)
+            # Check if the pill is already paid
+            if pill.paid:
+                raise serializers.ValidationError("This pill is already paid.")
+            serializer.save(pill=pill)
+        except Pill.DoesNotExist:
+            raise serializers.ValidationError("Pill does not exist or you do not have permission to create a payment request for this pill.")
 
 #^ < ==========================Dashboard endpoints========================== >
 
@@ -410,8 +435,60 @@ class ProductAvailabilitiesView(generics.ListAPIView):
         serializer = ProductAvailabilityBreifedSerializer(result, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+class AdminPayRequestCreateView(generics.CreateAPIView):
+    queryset = PayRequest.objects.all()
+    serializer_class = PayRequestSerializer
+    permission_classes = [IsAdminUser]  
+    parser_classes = [MultiPartParser, FormParser] 
+
+    def perform_create(self, serializer):
+        # Ensure the pill exists
+        pill_id = self.request.data.get('pill')
+        try:
+            pill = Pill.objects.get(id=pill_id)
+            # Check if the pill is already paid
+            if pill.paid:
+                raise serializers.ValidationError("This pill is already paid.")
+            # Create the PayRequest with is_applied=True
+            serializer.save(pill=pill, is_applied=True)
+        except Pill.DoesNotExist:
+            raise serializers.ValidationError("Pill does not exist.")
     
-    
-    
-    
-    
+class ApplyPayRequestView(generics.UpdateAPIView):
+    queryset = PayRequest.objects.all()
+    serializer_class = PayRequestSerializer
+    permission_classes = [IsAdminUser]
+    lookup_field = 'id'
+
+    def update(self, request, *args, **kwargs):
+        # Get the PayRequest instance
+        pay_request = self.get_object()
+
+        # Check if the PayRequest is already applied
+        if pay_request.is_applied:
+            return Response({"error": "This payment request has already been applied."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if the associated Pill is already paid
+        pill = pay_request.pill
+        if pill.paid:
+            return Response({"error": "This pill is already paid."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update the PayRequest to mark it as applied
+        pay_request.is_applied = True
+        pay_request.save()
+
+        # Update the associated Pill to mark it as paid
+        pill.paid = True
+        pill.status = 'p'
+        pill.save()
+        if pill.pilladdress:
+            prepare_whatsapp_message(pill.pilladdress.phone, pill)
+
+        # Return the updated PayRequest
+        serializer = self.get_serializer(pay_request)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+
+

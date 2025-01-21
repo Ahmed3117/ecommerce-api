@@ -2,7 +2,7 @@ from rest_framework import serializers
 from collections import defaultdict
 from urllib.parse import urljoin
 from accounts.models import User
-from .models import Category, CouponDiscount, PillAddress, PillItem, Shipping, SubCategory, Brand, Product, ProductImage, ProductAvailability, Rating, Color,Pill
+from .models import Category, CouponDiscount, PayRequest, PillAddress, PillItem, PillStatusLog, Shipping, SubCategory, Brand, Product, ProductImage, ProductAvailability, Rating, Color,Pill
 
 
 
@@ -297,10 +297,23 @@ class PillCreateSerializer(serializers.ModelSerializer):
             pill_item = PillItem.objects.create(**item_data)  # Create PillItem without passing 'pill'
             pill.items.add(pill_item)  # Associate the PillItem with the Pill
         return pill
-    
-    
-    
-    
+
+class PillStatusLogSerializer(serializers.ModelSerializer):
+    status_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PillStatusLog
+        fields = ['status', 'status_display', 'changed_at']
+
+    def get_status_display(self, obj):
+        return obj.get_status_display()
+
+class PayRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayRequest
+        fields = ['id', 'pill', 'image', 'date', 'is_applied']
+        read_only_fields = ['id', 'date']
+
 class PillDetailSerializer(serializers.ModelSerializer):
     items = PillItemSerializer(many=True, read_only=True)  # Updated to use PillItemSerializer
     coupon = CouponDiscountSerializer(read_only=True)
@@ -309,15 +322,17 @@ class PillDetailSerializer(serializers.ModelSerializer):
     status_display = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField() 
     user_username = serializers.SerializerMethodField()
+    status_logs = PillStatusLogSerializer(many=True, read_only=True)
+    pay_requests = PayRequestSerializer(many=True, read_only=True) 
 
     class Meta:
         model = Pill
         fields = [
             'id', 'user_name', 'user_username', 'items', 'status', 'status_display', 'date_added', 'paid', 'coupon', 'pilladdress',
             'price_without_coupons', 'coupon_discount', 'price_after_coupon_discount',
-            'shipping_price', 'final_price'
+            'shipping_price', 'final_price', 'status_logs', 'pay_requests'
         ]
-        read_only_fields = ['date_added', 'paid', 'price_without_coupons', 'coupon_discount', 'price_after_coupon_discount', 'shipping_price', 'final_price']
+        read_only_fields = ['date_added', 'price_without_coupons', 'coupon_discount', 'price_after_coupon_discount', 'shipping_price', 'final_price']
 
     def get_user_name(self, obj):
         return obj.user.name
@@ -333,5 +348,14 @@ class PillDetailSerializer(serializers.ModelSerializer):
 
     def get_status_display(self, obj):
         return obj.get_status_display()
+
+
+
+
+
+
+
+
+
 
 

@@ -15,6 +15,7 @@ urlpatterns = [
     path('ratings/<int:pk>/', CustomerRatingDetailView.as_view(), name='customer-rating-detail'),
     path('user-pills/', UserPillsView.as_view(), name='user-pills'),
     path('colors/', getColors.as_view(), name='colors'),
+    path('pay-requests/', PayRequestListCreateView.as_view(), name='pay-requests'),
     #^ < ==========================dashboard urls========================== >
     path('dashboard/categories/', CategoryListCreateView.as_view(), name='category-list-create'),
     path('dashboard/categories/<int:pk>/', CategoryRetrieveUpdateDestroyView.as_view(), name='category-detail'),
@@ -41,6 +42,8 @@ urlpatterns = [
     path('dashboard/product-availabilities/', ProductAvailabilityListCreateView.as_view(), name='product-availability-list-create'),
     path('dashboard/product-availabilities/<int:pk>/', ProductAvailabilityDetailView.as_view(), name='product-availability-detail'),
     path('dashboard/products/<int:product_id>/availabilities/', ProductAvailabilitiesView.as_view(), name='product-availabilities'),
+    path('dashboard/pay-requests/', AdminPayRequestCreateView.as_view(), name='admin-pay-request-create'),
+    path('dashboard/pay-requests/<int:id>/apply/', ApplyPayRequestView.as_view(), name='apply-pay-request'),
 
 ]
 

@@ -223,6 +223,12 @@ CORS_ALLOW_METHODS = [
 ]
 
 
+# ^ < ==========================WHATSAPP CONFIG========================== >
+
+#* WHATSAPP CREDENTIALS
+WHATSAPP_TOKEN = os.getenv('WHATSAPP_TOKEN')
+WHATSAPP_ID = os.getenv('WHATSAPP_ID')
+
 # ^ < ==========================AWS CONFIG========================== >
 
 """
