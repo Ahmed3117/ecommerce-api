@@ -10,12 +10,15 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'is_staff': {'read_only': True},
             'is_superuser': {'read_only': True},
+            'email': {'required': False, 'allow_null': True, 'allow_blank': True},  # Make email optional
         }
 
     def create(self, validated_data):
+        # Use .get() with default None for email since it can be optional
+        email = validated_data.get('email', None)
         user = User.objects.create_user(
             username=validated_data['username'],
-            email=validated_data['email'],
+            email=email,
             password=validated_data['password'],
             name=validated_data.get('name', ''),
             is_staff=validated_data.get('is_staff', False),
