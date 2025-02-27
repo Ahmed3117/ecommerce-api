@@ -112,7 +112,7 @@ class ProductSerializer(serializers.ModelSerializer):
     available_colors = serializers.SerializerMethodField()
     available_sizes = serializers.SerializerMethodField()
 
-    # Add direct fields for category, sub_category, and brand
+    # Read-only fields
     category_id = serializers.SerializerMethodField()
     category_name = serializers.SerializerMethodField()
     sub_category_id = serializers.SerializerMethodField()
@@ -120,13 +120,20 @@ class ProductSerializer(serializers.ModelSerializer):
     brand_id = serializers.SerializerMethodField()
     brand_name = serializers.SerializerMethodField()
 
+    # Writable fields
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=False)
+    sub_category = serializers.PrimaryKeyRelatedField(queryset=SubCategory.objects.all(), required=False)
+    brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all(), required=False)
+
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'category_id', 'category_name', 'sub_category_id', 'sub_category_name',
-            'brand_id', 'brand_name', 'price', 'description', 'date_added', 'discounted_price',
-            'has_discount', 'main_image', 'images', 'number_of_ratings', 'average_rating',
-            'total_quantity', 'available_colors', 'available_sizes', 'availabilities',
+            'id', 'name', 'category', 'category_id', 'category_name', 
+            'sub_category', 'sub_category_id', 'sub_category_name',
+            'brand', 'brand_id', 'brand_name', 'price', 'description', 
+            'date_added', 'discounted_price', 'has_discount', 'main_image', 
+            'images', 'number_of_ratings', 'average_rating', 'total_quantity', 
+            'available_colors', 'available_sizes', 'availabilities',
         ]
 
     def get_category_id(self, obj):
@@ -148,23 +155,20 @@ class ProductSerializer(serializers.ModelSerializer):
         return obj.brand.name if obj.brand else None
 
     def get_availabilities(self, obj):
-        # Group availabilities by size and color, and sum the quantities
         grouped_availabilities = defaultdict(int)
         for availability in obj.availabilities.all():
             key = (availability.size, availability.color.id if availability.color else None, availability.color.name if availability.color else None)
             grouped_availabilities[key] += availability.quantity
 
-        # Convert the grouped data into the desired format
-        result = [
+        return [
             {
                 "size": size,
-                "color_id": color_id,  # Include color_id
-                "color": color_name,   # Include color name
+                "color_id": color_id,
+                "color": color_name,
                 "quantity": quantity
             }
             for (size, color_id, color_name), quantity in grouped_availabilities.items()
         ]
-        return result
 
     def get_discounted_price(self, obj):
         return obj.discounted_price()
@@ -179,8 +183,7 @@ class ProductSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(main_image.image.url)
             else:
-                base_url = ""
-                return urljoin(base_url, main_image.image.url)
+                return main_image.image.url
         return None
 
     def get_number_of_ratings(self, obj):
@@ -197,6 +200,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def get_available_sizes(self, obj):
         return obj.available_sizes()
+
 
 class ProductBreifedSerializer(serializers.ModelSerializer):
     class Meta:
