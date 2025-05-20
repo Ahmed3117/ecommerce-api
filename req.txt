@@ -13,3 +13,5 @@ django-cors-headers
 pyyaml 
 ua-parser 
 user-agents
+requests
+django-cors-headers

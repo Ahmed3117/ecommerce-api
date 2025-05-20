@@ -16,6 +16,24 @@ urlpatterns = [
     path('user-pills/', UserPillsView.as_view(), name='user-pills'),
     path('colors/', getColors.as_view(), name='colors'),
     path('pay-requests/', PayRequestListCreateView.as_view(), name='pay-requests'),
+    path('discounts/active/', ProductsWithActiveDiscountAPIView.as_view(), name='active-discounts'),
+    path('loved-products/', LovedProductListCreateView.as_view(), name='loved-product-list-create'),
+    path('loved-products/<int:pk>/', LovedProductRetrieveDestroyView.as_view(), name='loved-product-detail'),
+    # alerts
+    path('alerts/stock/', StockAlertCreateView.as_view(), name='create-stock-alert'),
+    path('alerts/price-drop/', PriceDropAlertCreateView.as_view(), name='create-price-drop-alert'),
+    path('alerts/my-alerts/', UserActiveAlertsView.as_view(), name='user-alerts'),
+    path('alerts/mark-notified/<str:alert_type>/<int:alert_id>/', MarkAlertAsNotifiedView.as_view(), name='mark-alert-notified'),
+    # products suggestions
+    path('products/new-arrivals/', NewArrivalsView.as_view(), name='new-arrivals'),
+    path('products/best-sellers/', BestSellersView.as_view(), name='best-sellers'),
+    path('products/frequently-bought-together/', FrequentlyBoughtTogetherView.as_view(), name='frequently-bought-together'),
+    path('products/recommendations/', ProductRecommendationsView.as_view(), name='product-recommendations'),
+    # spin the wheel
+    path('spin-wheel/', SpinWheelView.as_view(), name='spin-wheel'),
+    path('spin-wheel/history/', SpinWheelHistoryView.as_view(), name='spin-wheel-history'),
+
+
     #^ < ==========================dashboard urls========================== >
     path('dashboard/categories/', CategoryListCreateView.as_view(), name='category-list-create'),
     path('dashboard/categories/<int:pk>/', CategoryRetrieveUpdateDestroyView.as_view(), name='category-detail'),
@@ -44,6 +62,12 @@ urlpatterns = [
     path('dashboard/products/<int:product_id>/availabilities/', ProductAvailabilitiesView.as_view(), name='product-availabilities'),
     path('dashboard/pay-requests/', AdminPayRequestCreateView.as_view(), name='admin-pay-request-create'),
     path('dashboard/pay-requests/<int:id>/apply/', ApplyPayRequestView.as_view(), name='apply-pay-request'),
+    path('dashboard/discounts/', DiscountListCreateView.as_view(), name='discount-list-create'),
+    path('dashboard/discounts/<int:pk>/', DiscountRetrieveUpdateDestroyView.as_view(), name='discount-detail'),
+    path('dashboard/loved-products/', DashboardLovedProductListView.as_view(), name='dashboard-loved-product-list'),
+    path('dashboard/loved-products/<int:pk>/', DashboardLovedProductDetailView.as_view(), name='dashboard-loved-product-detail'),
+    path('dashboard/low-threshold-products/', LowThresholdProductsView.as_view(), name='low-threshold-products'),
+    
 
 ]
 
