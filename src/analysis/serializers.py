@@ -1,4 +1,4 @@
-# serializers.py
+
 from rest_framework import serializers
 
 from products.models import Category, Product
@@ -14,16 +14,20 @@ class ProductAnalyticsSerializer(serializers.ModelSerializer):
     has_discount = serializers.BooleanField()
     current_discount = serializers.FloatField()
     price_after_discount = serializers.FloatField()
-    
+    threshold = serializers.IntegerField()
+    is_low_stock = serializers.SerializerMethodField()
     def get_category_name(self, obj):
         return obj.category.name if obj.category else "No Category"
+    def get_is_low_stock(self, obj):
+        return obj.total_quantity() <= obj.threshold
+    
     
     class Meta:
         model = Product
         fields = [
             'id', 'name', 'category_name', 'total_available', 'total_added',
             'total_sold', 'revenue', 'average_rating', 'total_ratings',
-            'price', 'has_discount', 'current_discount', 'price_after_discount',
+            'price', 'has_discount', 'current_discount', 'price_after_discount','threshold', 'is_low_stock',
             'date_added'
         ]
 

@@ -41,7 +41,9 @@ INSTALLED_APPS = [
     'storages',
     #* Apps
     'accounts',
+    'about',
     'products',
+    'analysis',
 
 ]
 

@@ -1,6 +1,7 @@
+
 from django.contrib import admin
 from .models import (
-    Category, PayRequest, PillItem, ProductSales, SubCategory, Brand, Product, ProductImage, 
+    Category, PayRequest, PillItem, PriceDropAlert, ProductSales, SpinWheelDiscount, SpinWheelResult, StockAlert, SubCategory, Brand, Product, ProductImage, 
     Color, ProductAvailability, Rating, Shipping, Pill, Discount,
     CouponDiscount, PillAddress
 )
@@ -166,3 +167,38 @@ class PayRequestAdmin(admin.ModelAdmin):
     list_display = ['pill', 'date', 'is_applied']
     list_filter = ['is_applied']
     search_fields = ['pill__pill_number', 'pill__user__name', 'pill__pilladdress__email', 'pill__pilladdress__phone']
+
+
+
+@admin.register(StockAlert)
+class StockAlertAdmin(admin.ModelAdmin):
+    list_display = ('product', 'user', 'email', 'created_at', 'is_notified')
+    list_filter = ('is_notified', 'created_at')
+    search_fields = ('product__name', 'user__username', 'email')
+    raw_id_fields = ('product', 'user')
+    date_hierarchy = 'created_at'
+
+@admin.register(PriceDropAlert)
+class PriceDropAlertAdmin(admin.ModelAdmin):
+    list_display = ('product', 'user', 'email', 'last_price', 'created_at', 'is_notified')
+    list_filter = ('is_notified', 'created_at')
+    search_fields = ('product__name', 'user__username', 'email')
+    raw_id_fields = ('product', 'user')
+    date_hierarchy = 'created_at'
+
+
+@admin.register(SpinWheelDiscount)
+class SpinWheelDiscountAdmin(admin.ModelAdmin):
+    list_display = ['name', 'coupon', 'probability', 'is_active']
+    list_filter = ['is_active']
+    search_fields = ['name', 'coupon__coupon']
+
+@admin.register(SpinWheelResult)
+class SpinWheelResultAdmin(admin.ModelAdmin):
+    list_display = ['user', 'spin_wheel', 'won', 'used', 'spin_date']
+    list_filter = ['won', 'used', 'spin_wheel']
+    search_fields = ['user__username', 'spin_wheel__name']
+
+
+
+

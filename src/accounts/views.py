@@ -7,8 +7,8 @@ from django.core.mail import send_mail
 from django.utils import timezone
 from datetime import timedelta
 import random
-from .serializers import UserSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer
-from .models import User
+from .serializers import UserAddressSerializer, UserProfileSerializer, UserSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer
+from .models import User, UserAddress
 
 from rest_framework import generics
 
@@ -104,7 +104,7 @@ def reset_password_confirm(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UpdateUserProfile(generics.UpdateAPIView):
+class UpdateUserData(generics.UpdateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
@@ -120,14 +120,39 @@ class UpdateUserProfile(generics.UpdateAPIView):
         self.perform_update(serializer)
         return Response(serializer.data)
 
-class GetUserProfile(generics.RetrieveAPIView):
+class GetUserData(generics.RetrieveAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
         return self.request.user
 
+class UserAddressListCreateView(generics.ListCreateAPIView):
+    serializer_class = UserAddressSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ['is_default']
+    search_fields = ['name', 'email', 'phone', 'address']
 
+    def get_queryset(self):
+        return UserAddress.objects.filter(user=self.request.user).order_by('-is_default', '-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+class UserAddressRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = UserAddressSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return UserAddress.objects.filter(user=self.request.user)
+
+class UserProfileView(generics.RetrieveAPIView):
+    serializer_class = UserProfileSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+    
 #^ ---------------------------------------------------- Dashboard ---------------------------- ^#
 
 @api_view(['POST'])

@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from collections import defaultdict
 from urllib.parse import urljoin
+from django.utils import timezone
 from accounts.models import User
-from .models import Category, CouponDiscount, PayRequest, PillAddress, PillItem, PillStatusLog, Shipping, SubCategory, Brand, Product, ProductImage, ProductAvailability, Rating, Color,Pill
+from .models import Category, CouponDiscount, Discount, LovedProduct, PayRequest, PillAddress, PillItem, PillStatusLog, PriceDropAlert, Shipping, SpinWheelDiscount, SpinWheelResult, StockAlert, SubCategory, Brand, Product, ProductImage, ProductAvailability, Rating, Color,Pill
 
 
 
@@ -50,10 +51,11 @@ class ProductAvailabilitySerializer(serializers.ModelSerializer):
         required=False    # Make the field optional
     )
     product_name = serializers.SerializerMethodField()
+    native_price = serializers.FloatField()
 
     class Meta:
         model = ProductAvailability
-        fields = ['id', 'product', 'product_name', 'size', 'color', 'quantity']
+        fields = ['id', 'product', 'product_name', 'size', 'color', 'quantity','native_price']
 
     def get_product_name(self, obj):
         return obj.product.name
@@ -71,7 +73,7 @@ class ProductAvailabilityBreifedSerializer(serializers.Serializer):
     size = serializers.CharField()
     color = serializers.CharField()
     quantity = serializers.IntegerField()
-
+    is_low_stock = serializers.BooleanField()
 
 class RatingSerializer(serializers.ModelSerializer):
     class Meta:
@@ -111,6 +113,10 @@ class ProductSerializer(serializers.ModelSerializer):
     total_quantity = serializers.SerializerMethodField()
     available_colors = serializers.SerializerMethodField()
     available_sizes = serializers.SerializerMethodField()
+    current_discount = serializers.SerializerMethodField()
+    discount_expiry = serializers.SerializerMethodField()
+    threshold = serializers.IntegerField()
+    is_low_stock = serializers.SerializerMethodField()
 
     # Add direct fields for category, sub_category, and brand
     category_id = serializers.SerializerMethodField()
@@ -125,8 +131,8 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'category_id', 'category_name', 'sub_category_id', 'sub_category_name',
             'brand_id', 'brand_name', 'price', 'description', 'date_added', 'discounted_price',
-            'has_discount', 'main_image', 'images', 'number_of_ratings', 'average_rating',
-            'total_quantity', 'available_colors', 'available_sizes', 'availabilities',
+            'has_discount','current_discount', 'discount_expiry', 'main_image', 'images', 'number_of_ratings', 'average_rating',
+            'total_quantity', 'available_colors', 'available_sizes', 'availabilities','threshold', 'is_low_stock',
         ]
 
     def get_category_id(self, obj):
@@ -169,6 +175,49 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_discounted_price(self, obj):
         return obj.discounted_price()
 
+    def get_current_discount(self, obj):
+        # Get the best active discount (product or category)
+        now = timezone.now()
+        product_discount = obj.discounts.filter(
+            is_active=True,
+            discount_start__lte=now,
+            discount_end__gte=now
+        ).order_by('-discount').first()
+
+        category_discount = None
+        if obj.category:
+            category_discount = obj.category.discounts.filter(
+                is_active=True,
+                discount_start__lte=now,
+                discount_end__gte=now
+            ).order_by('-discount').first()
+
+        if product_discount and category_discount:
+            return max(product_discount.discount, category_discount.discount)
+        elif product_discount:
+            return product_discount.discount
+        elif category_discount:
+            return category_discount.discount
+        return None
+
+    def get_discount_expiry(self, obj):
+        # Get the expiry date of the current discount
+        now = timezone.now()
+        discount = obj.discounts.filter(
+            is_active=True,
+            discount_start__lte=now,
+            discount_end__gte=now
+        ).order_by('-discount_end').first()
+
+        if not discount and obj.category:
+            discount = obj.category.discounts.filter(
+                is_active=True,
+                discount_start__lte=now,
+                discount_end__gte=now
+            ).order_by('-discount_end').first()
+
+        return discount.discount_end if discount else None
+    
     def get_has_discount(self, obj):
         return obj.has_discount()
 
@@ -198,6 +247,9 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_available_sizes(self, obj):
         return obj.available_sizes()
 
+    def get_is_low_stock(self, obj):
+        return obj.total_quantity() <= obj.threshold
+    
 class ProductBreifedSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
@@ -324,6 +376,7 @@ class PillDetailSerializer(serializers.ModelSerializer):
     user_username = serializers.SerializerMethodField()
     status_logs = PillStatusLogSerializer(many=True, read_only=True)
     pay_requests = PayRequestSerializer(many=True, read_only=True) 
+    final_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Pill
@@ -348,14 +401,88 @@ class PillDetailSerializer(serializers.ModelSerializer):
 
     def get_status_display(self, obj):
         return obj.get_status_display()
+    
+    def get_final_price(self, obj):
+        return obj.price_after_coupon_discount() + obj.shipping_price()
 
+class DiscountSerializer(serializers.ModelSerializer):
+    product_name = serializers.SerializerMethodField()
+    category_name = serializers.SerializerMethodField()
+    is_active = serializers.SerializerMethodField()
 
+    class Meta:
+        model = Discount
+        fields = [
+            'id', 'product', 'product_name', 'category', 'category_name', 
+            'discount', 'discount_start', 'discount_end', 'is_active'
+        ]
+        read_only_fields = ['is_active']
 
+    def get_product_name(self, obj):
+        return obj.product.name if obj.product else None
 
+    def get_category_name(self, obj):
+        return obj.category.name if obj.category else None
 
+    def get_is_active(self, obj):
+        return obj.is_currently_active
 
+    def validate(self, data):
+        if not data.get('product') and not data.get('category'):
+            raise serializers.ValidationError("Either product or category must be set")
+        if data.get('product') and data.get('category'):
+            raise serializers.ValidationError("Cannot set both product and category")
+        return data
 
+class LovedProductSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(),
+        source='product',
+        write_only=True
+    )
 
+    class Meta:
+        model = LovedProduct
+        fields = ['id', 'product', 'product_id', 'created_at']
+        read_only_fields = ['id', 'created_at']
 
+class StockAlertSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StockAlert
+        fields = ['id', 'product', 'email', 'created_at']
+        read_only_fields = ['id', 'created_at']
+        extra_kwargs = {
+            'email': {'required': False}
+        }
+
+class PriceDropAlertSerializer(serializers.ModelSerializer):
+    last_price = serializers.FloatField(required=False)  # Made optional
+    
+    class Meta:
+        model = PriceDropAlert
+        fields = ['id', 'product', 'email', 'last_price', 'created_at']
+        read_only_fields = ['id', 'created_at']
+        extra_kwargs = {
+            'email': {'required': False}
+        }
+
+    def validate_last_price(self, value):
+        if value and value <= 0:
+            raise serializers.ValidationError("Price must be positive")
+        return value
+
+class SpinWheelDiscountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SpinWheelDiscount
+        fields = ['id', 'name', 'probability', 'daily_spin_limit', 
+                 'min_order_value', 'start_date', 'end_date']
+
+class SpinWheelResultSerializer(serializers.ModelSerializer):
+    coupon = CouponDiscountSerializer(read_only=True)
+    
+    class Meta:
+        model = SpinWheelResult
+        fields = ['id', 'won', 'coupon', 'spin_date', 'used', 'used_date']
 
 

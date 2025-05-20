@@ -1,14 +1,16 @@
 # views.py
 from rest_framework.viewsets import ViewSet
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAdminUser
 from django.db.models import Sum, Count, Avg, F, Q, FloatField, Case, When, BooleanField, Subquery, OuterRef, IntegerField, ExpressionWrapper
 from django.utils import timezone
 from datetime import datetime
 from django.db.models.functions import Coalesce
 from django.db.models.functions import TruncDay, TruncWeek, TruncMonth, TruncYear,TruncDate
 from analysis.serializers import CategoryAnalyticsSerializer, InventoryAlertSerializer, ProductAnalyticsSerializer, SalesTrendSerializer
-from products.models import Category, Discount, Pill, Product
+from products.models import Category, Discount, Pill, Product, ProductAvailability, ProductSales
 from rest_framework import generics, filters
 from rest_framework.response import Response
 from django_filters import rest_framework as django_filters
@@ -128,59 +130,133 @@ class CategoryPerformanceView(generics.ListAPIView):
         )
 
 
-class SalesTrendsView(generics.ListAPIView):
-    serializer_class = SalesTrendSerializer
+# class SalesTrendsView(generics.ListAPIView):
+#     serializer_class = SalesTrendSerializer
     
-    def get_queryset(self):
-        # Get date parameters
-        start_date = self.request.query_params.get('start_date')
-        end_date = self.request.query_params.get('end_date')
+#     def get_queryset(self):
+#         # Get date parameters
+#         start_date = self.request.query_params.get('start_date')
+#         end_date = self.request.query_params.get('end_date')
         
-        # Base queryset for delivered orders
-        queryset = Pill.objects.filter(status='d')
+#         # Base queryset for delivered orders
+#         queryset = Pill.objects.filter(status='d')
         
-        # If dates provided, filter by date range
-        if start_date and end_date:
-            try:
-                start = datetime.strptime(start_date, '%Y-%m-%d')
-                end = datetime.strptime(end_date, '%Y-%m-%d')
-                queryset = queryset.filter(date_added__range=(start, end))
-                date_start = start.date()
-                date_end = end.date()
-            except ValueError:
-                return []
-        else:
-            # For all-time totals, get the date of first and last order
-            first_order = queryset.order_by('date_added').first()
-            last_order = queryset.order_by('-date_added').first()
+#         # If dates provided, filter by date range
+#         if start_date and end_date:
+#             try:
+#                 start = datetime.strptime(start_date, '%Y-%m-%d')
+#                 end = datetime.strptime(end_date, '%Y-%m-%d')
+#                 queryset = queryset.filter(date_added__range=(start, end))
+#                 date_start = start.date()
+#                 date_end = end.date()
+#             except ValueError:
+#                 return []
+#         else:
+#             # For all-time totals, get the date of first and last order
+#             first_order = queryset.order_by('date_added').first()
+#             last_order = queryset.order_by('-date_added').first()
             
-            if first_order and last_order:
-                date_start = first_order.date_added.date()
-                date_end = last_order.date_added.date()
-            else:
-                # If no orders exist
-                today = timezone.now().date()
-                date_start = today
-                date_end = today
+#             if first_order and last_order:
+#                 date_start = first_order.date_added.date()
+#                 date_end = last_order.date_added.date()
+#             else:
+#                 # If no orders exist
+#                 today = timezone.now().date()
+#                 date_start = today
+#                 date_end = today
 
-        # Get aggregated data
-        results = queryset.aggregate(
-            total_sales=Count('id'),
-            revenue=Sum(
-                ExpressionWrapper(
-                    F('items__quantity') * F('items__product__price'),
-                    output_field=FloatField()
-                )
-            )
-        )
+#         # Get aggregated data
+#         results = queryset.aggregate(
+#             total_sales=Count('id'),
+#             revenue=Sum(
+#                 ExpressionWrapper(
+#                     F('items__quantity') * F('items__product__price'),
+#                     output_field=FloatField()
+#                 )
+#             )
+#         )
         
-        # Add date range to results
-        results['start_date'] = date_start
-        results['end_date'] = date_end
+#         # Add date range to results
+#         results['start_date'] = date_start
+#         results['end_date'] = date_end
         
-        # Handle None values
-        results['total_sales'] = results['total_sales'] or 0
-        results['revenue'] = results['revenue'] or 0.0
+#         # Handle None values
+#         results['total_sales'] = results['total_sales'] or 0
+#         results['revenue'] = results['revenue'] or 0.0
         
-        return [results]
+#         return [results]
+
+
+
+class SalesTrendsView(APIView):
+    # permission_classes = [IsAdminUser]
+    
+    def get(self, request):
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        # Get daily sales trends
+        daily_sales = ProductSales.objects.filter(
+            date_sold__range=[start_date, end_date]
+        ).annotate(
+            day=TruncDay('date_sold')
+        ).values('day').annotate(
+            total_sales=Sum('quantity'),
+            total_revenue=Sum(F('quantity') * F('price_at_sale')),
+            total_cost=Sum(F('quantity') * F('product__availabilities__native_price'))
+        ).order_by('day')
+        
+        # Get product-wise sales
+        product_sales = ProductSales.objects.filter(
+            date_sold__range=[start_date, end_date]
+        ).values(
+            'product__name', 'product__id'
+        ).annotate(
+            total_sales=Sum('quantity'),
+            total_revenue=Sum(F('quantity') * F('price_at_sale')),
+            total_cost=Sum(F('quantity') * F('product__availabilities__native_price'))
+        ).order_by('-total_revenue')
+        
+        return Response({
+            'daily_sales': daily_sales,
+            'product_sales': product_sales,
+            'time_range': {
+                'start_date': start_date,
+                'end_date': end_date
+            }
+        })
+
+
+
+class ProductCostRevenueAnalysisView(APIView):
+    # permission_classes = [IsAdminUser]
+    
+    def get(self, request):
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        # Calculate total cost of purchased inventory
+        inventory_cost = ProductAvailability.objects.filter(
+            date_added__range=[start_date, end_date]
+        ).aggregate(
+            total_cost=Sum(F('quantity') * F('native_price'))
+        )['total_cost'] or 0
+        
+        # Calculate total revenue from sales
+        sales_revenue = ProductSales.objects.filter(
+            date_sold__range=[start_date, end_date]
+        ).aggregate(
+            total_revenue=Sum(F('quantity') * F('price_at_sale'))
+        )['total_revenue'] or 0
+        
+        # Calculate profit
+        profit = sales_revenue - inventory_cost
+        
+        return Response({
+            'inventory_cost': inventory_cost,
+            'sales_revenue': sales_revenue,
+            'profit': profit,
+            'start_date': start_date,
+            'end_date': end_date
+        })
 
