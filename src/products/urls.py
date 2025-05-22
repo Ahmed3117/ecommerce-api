@@ -19,6 +19,8 @@ urlpatterns = [
     path('discounts/active/', ProductsWithActiveDiscountAPIView.as_view(), name='active-discounts'),
     path('loved-products/', LovedProductListCreateView.as_view(), name='loved-product-list-create'),
     path('loved-products/<int:pk>/', LovedProductRetrieveDestroyView.as_view(), name='loved-product-detail'),
+    # Special Products
+    path('special-products/active/', ActiveSpecialProductsView.as_view(), name='active-special-products'),
     # alerts
     path('alerts/stock/', StockAlertCreateView.as_view(), name='create-stock-alert'),
     path('alerts/price-drop/', PriceDropAlertCreateView.as_view(), name='create-price-drop-alert'),
@@ -32,7 +34,6 @@ urlpatterns = [
     # spin the wheel
     path('spin-wheel/', SpinWheelView.as_view(), name='spin-wheel'),
     path('spin-wheel/history/', SpinWheelHistoryView.as_view(), name='spin-wheel-history'),
-
 
     #^ < ==========================dashboard urls========================== >
     path('dashboard/categories/', CategoryListCreateView.as_view(), name='category-list-create'),
@@ -67,7 +68,12 @@ urlpatterns = [
     path('dashboard/loved-products/', DashboardLovedProductListView.as_view(), name='dashboard-loved-product-list'),
     path('dashboard/loved-products/<int:pk>/', DashboardLovedProductDetailView.as_view(), name='dashboard-loved-product-detail'),
     path('dashboard/low-threshold-products/', LowThresholdProductsView.as_view(), name='low-threshold-products'),
-    
-
+    # Special Products
+    path('dashboard/special-products/', SpecialProductListCreateView.as_view(), name='special-product-list'),
+    path('dashboard/special-products/<int:pk>/', SpecialProductRetrieveUpdateDestroyView.as_view(), name='special-product-detail'),
+    # Product Descriptions
+    path('dashboard/product-descriptions/', ProductDescriptionListCreateView.as_view(), name='product-description-list'),
+    path('dashboard/product-descriptions/bulk/', ProductDescriptionBulkCreateView.as_view(), name='product-description-bulk-create'),
+    path('dashboard/product-descriptions/<int:pk>/', ProductDescriptionRetrieveUpdateDestroyView.as_view(), name='product-description-detail'),
 ]
 

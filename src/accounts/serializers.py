@@ -5,20 +5,32 @@ from products.models import LovedProduct, Pill, Product
 from products.serializers import LovedProductSerializer, PillDetailSerializer
 from .models import User, UserAddress
 
+
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
-
+    
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'password', 'name', 'is_staff', 'is_superuser')
+        fields = ('id', 'username', 'email', 'password', 'name', 
+                 'is_staff', 'is_superuser', 'user_type', 'phone', 'year')
         extra_kwargs = {
             'is_staff': {'read_only': True},
             'is_superuser': {'read_only': True},
-            'email': {'required': False, 'allow_null': True, 'allow_blank': True},  # Make email optional
+            'email': {'required': False, 'allow_null': True, 'allow_blank': True},
+            'user_type': {'required': False, 'allow_null': True},
+            'phone': {'required': False, 'allow_null': True, 'allow_blank': True},
+            'year': {'required': False, 'allow_null': True},
         }
 
+    def validate(self, data):
+        # Validate that year is only set for students
+        if data.get('year') and data.get('user_type') != 'student':
+            raise serializers.ValidationError(
+                "Year can only be set for student users"
+            )
+        return data
+
     def create(self, validated_data):
-        # Use .get() with default None for email since it can be optional
         email = validated_data.get('email', None)
         user = User.objects.create_user(
             username=validated_data['username'],
@@ -27,6 +39,9 @@ class UserSerializer(serializers.ModelSerializer):
             name=validated_data.get('name', ''),
             is_staff=validated_data.get('is_staff', False),
             is_superuser=validated_data.get('is_superuser', False),
+            user_type=validated_data.get('user_type', None),
+            phone=validated_data.get('phone', None),
+            year=validated_data.get('year', None),
         )
         return user
 
@@ -68,7 +83,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'username', 'email', 'name',
+            'id', 'username', 'email', 'name','user_type', 'phone', 'year',
             'addresses', 'pills', 'loved_products',
             'total_spent', 'favorite_category'
         ]

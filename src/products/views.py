@@ -54,7 +54,16 @@ class ProductDetailView(generics.RetrieveAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     lookup_field = 'id'
-    
+
+class ActiveSpecialProductsView(generics.ListAPIView):
+    serializer_class = SpecialProductSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        return SpecialProduct.objects.filter(
+            is_active=True
+        ).order_by('-order')[:10] 
+
 class PillCreateView(generics.CreateAPIView):
     queryset = Pill.objects.all()
     serializer_class = PillCreateSerializer
@@ -697,6 +706,63 @@ class ProductImageDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ProductImage.objects.all()
     serializer_class = ProductImageSerializer
     permission_classes = [IsAdminUser] 
+
+class ProductDescriptionListCreateView(generics.ListCreateAPIView):
+    queryset = ProductDescription.objects.all()
+    serializer_class = ProductDescriptionSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['product']
+    permission_classes = [IsAdminUser]
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST' and isinstance(self.request.data, list):
+            return ProductDescriptionCreateSerializer
+        return ProductDescriptionSerializer
+
+class ProductDescriptionBulkCreateView(generics.CreateAPIView):
+    queryset = ProductDescription.objects.all()
+    permission_classes = [IsAdminUser]
+
+    def get_serializer_class(self):
+        if isinstance(self.request.data, list):
+            # Use a custom serializer for bulk operations
+            class BulkSerializer(ProductDescriptionCreateSerializer):
+                class Meta(ProductDescriptionCreateSerializer.Meta):
+                    list_serializer_class = BulkProductDescriptionSerializer
+            return BulkSerializer
+        return ProductDescriptionCreateSerializer
+
+    def create(self, request, *args, **kwargs):
+        if isinstance(request.data, list):
+            serializer = self.get_serializer(data=request.data, many=True)
+        else:
+            serializer = self.get_serializer(data=request.data)
+        
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+class ProductDescriptionRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = ProductDescription.objects.all()
+    serializer_class = ProductDescriptionSerializer
+    permission_classes = [IsAdminUser]
+
+class SpecialProductListCreateView(generics.ListCreateAPIView):
+    queryset = SpecialProduct.objects.all()
+    serializer_class = SpecialProductSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['is_active', 'product']
+    ordering_fields = ['order', 'created_at']
+    permission_classes = [IsAdminUser]
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+class SpecialProductRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = SpecialProduct.objects.all()
+    serializer_class = SpecialProductSerializer
+    permission_classes = [IsAdminUser]
 
 class PillListCreateView(generics.ListCreateAPIView):
     queryset = Pill.objects.all()

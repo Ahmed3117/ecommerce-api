@@ -3,7 +3,7 @@ from collections import defaultdict
 from urllib.parse import urljoin
 from django.utils import timezone
 from accounts.models import User
-from .models import Category, CouponDiscount, Discount, LovedProduct, PayRequest, PillAddress, PillItem, PillStatusLog, PriceDropAlert, Shipping, SpinWheelDiscount, SpinWheelResult, StockAlert, SubCategory, Brand, Product, ProductImage, ProductAvailability, Rating, Color,Pill
+from .models import Category, CouponDiscount, Discount, LovedProduct, PayRequest, PillAddress, PillItem, PillStatusLog, PriceDropAlert, ProductDescription, Shipping, SpecialProduct, SpinWheelDiscount, SpinWheelResult, StockAlert, SubCategory, Brand, Product, ProductImage, ProductAvailability, Rating, Color,Pill
 
 
 
@@ -29,6 +29,29 @@ class BrandSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
         fields = '__all__'
+
+class ProductDescriptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductDescription
+        fields = ['id', 'title', 'description', 'order', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+class ProductDescriptionCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductDescription
+        fields = ['product', 'title', 'description', 'order']
+    
+    def to_internal_value(self, data):
+        # Handle both single and bulk creation
+        if isinstance(data, list):
+            return [super().to_internal_value(item) for item in data]
+        return super().to_internal_value(data)
+
+class BulkProductDescriptionSerializer(serializers.ListSerializer):
+    def create(self, validated_data):
+        descriptions = [ProductDescription(**item) for item in validated_data]
+        return ProductDescription.objects.bulk_create(descriptions)
+
 
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -115,8 +138,8 @@ class ProductSerializer(serializers.ModelSerializer):
     available_sizes = serializers.SerializerMethodField()
     current_discount = serializers.SerializerMethodField()
     discount_expiry = serializers.SerializerMethodField()
-    threshold = serializers.IntegerField()
     is_low_stock = serializers.SerializerMethodField()
+    descriptions = ProductDescriptionSerializer(many=True, read_only=True)
 
     # Add direct fields for category, sub_category, and brand
     category_id = serializers.SerializerMethodField()
@@ -132,7 +155,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'id', 'name', 'category_id', 'category_name', 'sub_category_id', 'sub_category_name',
             'brand_id', 'brand_name', 'price', 'description', 'date_added', 'discounted_price',
             'has_discount','current_discount', 'discount_expiry', 'main_image', 'images', 'number_of_ratings', 'average_rating',
-            'total_quantity', 'available_colors', 'available_sizes', 'availabilities','threshold', 'is_low_stock',
+            'total_quantity', 'available_colors', 'available_sizes', 'availabilities','descriptions','threshold', 'is_low_stock','is_important'
         ]
 
     def get_category_id(self, obj):
@@ -270,6 +293,22 @@ class CouponCodeField(serializers.Field):
         # Return the coupon code for representation
         return value.coupon
 
+class SpecialProductSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(),
+        source='product',
+        write_only=True
+    )
+
+    class Meta:
+        model = SpecialProduct
+        fields = [
+            'id', 'product', 'product_id', 'special_image', 
+            'order', 'is_active', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
 class PillCouponApplySerializer(serializers.ModelSerializer):
     coupon = CouponCodeField()  # Use the custom field for coupon
 
@@ -326,12 +365,12 @@ class PillCreateSerializer(serializers.ModelSerializer):
     items = PillItemCreateSerializer(many=True)  # Nested serializer for PillItem
     user_name = serializers.SerializerMethodField() 
     user_username = serializers.SerializerMethodField()  
-    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False)  # Make user optional
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:
         model = Pill
         fields = ['id', 'user', 'user_name', 'user_username', 'items', 'status', 'date_added', 'paid']
-        read_only_fields = ['status', 'date_added', 'paid']
+        read_only_fields = ['id','status', 'date_added', 'paid']
 
     def get_user_name(self, obj):
         return obj.user.name
@@ -340,14 +379,21 @@ class PillCreateSerializer(serializers.ModelSerializer):
         return obj.user.username
 
     def create(self, validated_data):
-        # Extract the nested items data
         items_data = validated_data.pop('items')
-        # Create the Pill instance
         pill = Pill.objects.create(**validated_data)
-        # Create PillItem instances and add them to the Pill
-        for item_data in items_data:
-            pill_item = PillItem.objects.create(**item_data)  # Create PillItem without passing 'pill'
-            pill.items.add(pill_item)  # Associate the PillItem with the Pill
+        
+        # Use bulk_create for better performance
+        pill_items = [
+            PillItem(
+                product=item['product'],
+                quantity=item['quantity'],
+                size=item.get('size'),
+                color=item.get('color')
+            ) for item in items_data
+        ]
+        created_items = PillItem.objects.bulk_create(pill_items)
+        pill.items.set(created_items)
+        
         return pill
 
 class PillStatusLogSerializer(serializers.ModelSerializer):

@@ -70,7 +70,9 @@ def generate_pill_number():
     while True:
         # Generate a random 20-digit string
         pill_number = ''.join(random.choices(string.digits, k=20))
-        return pill_number
+        if not Pill.objects.filter(pill_number=pill_number).exists():
+            return pill_number
+
 
 def create_random_coupon():
     letters = string.ascii_lowercase
@@ -110,6 +112,10 @@ class Product(models.Model):
         help_text="Minimum quantity threshold for low stock alerts"
     )
     description = models.TextField(max_length=1000, null=True, blank=True)
+    is_important = models.BooleanField(
+        default=False,
+        help_text="Mark if this product is important/special"
+    )
     date_added = models.DateTimeField(auto_now_add=True)
 
     def get_current_discount(self):
@@ -194,6 +200,36 @@ class Product(models.Model):
     def __str__(self):
         return self.name
 
+class SpecialProduct(models.Model):
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='special_products'
+    )
+    special_image = models.ImageField(
+        upload_to='special_products/',
+        null=True,
+        blank=True
+    )
+    order = models.PositiveIntegerField(
+        default=0,
+        help_text="Ordering priority (higher numbers come first)"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Show this special product"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-order', '-created_at']
+        verbose_name = 'Special Product'
+        verbose_name_plural = 'Special Products'
+
+    def __str__(self):
+        return f"Special: {self.product.name}"
+
 class ProductImage(models.Model):
     product = models.ForeignKey(
         Product,
@@ -204,6 +240,26 @@ class ProductImage(models.Model):
 
     def __str__(self):
         return f"Image for {self.product.name}"
+
+class ProductDescription(models.Model):
+    product = models.ForeignKey(
+        Product, 
+        on_delete=models.CASCADE, 
+        related_name='descriptions'
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'created_at']
+        verbose_name = 'Product Description'
+        verbose_name_plural = 'Product Descriptions'
+
+    def __str__(self):
+        return f"{self.title} - {self.product.name}"
 
 class Color(models.Model):
     name = models.CharField(max_length=50, unique=True)
@@ -291,66 +347,81 @@ class Pill(models.Model):
     paid = models.BooleanField(default=False)
     coupon = models.ForeignKey('CouponDiscount', on_delete=models.SET_NULL, null=True, blank=True, related_name='pills')
     coupon_discount = models.FloatField(default=0.0)  # Store the coupon discount as a field
-    pill_number = models.CharField(max_length=20, editable=False)
+    pill_number = models.CharField(
+        max_length=20, 
+        editable=False,
+        unique=True,
+        default=generate_pill_number
+    )
 
     def save(self, *args, **kwargs):
+        # Generate pill number if not set
         if not self.pill_number:
             self.pill_number = generate_pill_number()
         
-        # Log the initial status if the pill is being created
-        if not self.pk:
-            super().save(*args, **kwargs)
+        # Check if this is a new pill
+        is_new = not self.pk
+        
+        # First save to create the pill
+        super().save(*args, **kwargs)
+        
+        if is_new:
+            # Log the initial status
             PillStatusLog.objects.create(pill=self, status=self.status)
         else:
             # Check if status changed
             old_pill = Pill.objects.get(pk=self.pk)
             if old_pill.status != self.status:
-                # Log the status change or update the existing log
-                status_log, created = PillStatusLog.objects.get_or_create(pill=self, status=self.status)
+                # Log the status change
+                status_log, created = PillStatusLog.objects.get_or_create(
+                    pill=self, 
+                    status=self.status
+                )
                 if not created:
                     status_log.changed_at = timezone.now()
                     status_log.save()
+            
+            # Handle delivered status
             if old_pill.status != 'd' and self.status == 'd':
-                # Process each item in the pill
-                for item in self.items.all():
-                    # Create sales record
-                    ProductSales.objects.create(
-                        product=item.product,
-                        quantity=item.quantity,
-                        size=item.size,
-                        color=item.color,
-                        price_at_sale=item.product.discounted_price(),
-                        pill=self
-                    )
-                    
-                    # Decrease product availability
-                    try:
-                        # Find matching availability
-                        availability = ProductAvailability.objects.get(
-                            product=item.product,
-                            size=item.size,
-                            color=item.color
-                        )
-                        
-                        # Check if enough quantity is available
-                        if availability.quantity >= item.quantity:
-                            availability.quantity -= item.quantity
-                            availability.save()
-                        else:
-                            raise ValidationError(f"Not enough inventory for {item.product.name}")
-                            
-                    except ProductAvailability.DoesNotExist:
-                        raise ValidationError(f"No matching availability found for {item.product.name}")
+                self.process_delivery()
         
-        # Update status to 'p' (Paid) if self.paid becomes True
-        if self.paid:
-            print("Pill is paid")
+        # Handle payment status
+        if self.paid and self.status != 'p':
             self.status = 'p'
-            # Send WhatsApp message when the pill is paid
-            if hasattr(self, 'pilladdress') and self.pilladdress.phone:
-                prepare_whatsapp_message(self.pilladdress.phone, self)
+            super().save(*args, **kwargs)
+            self.send_payment_notification()
 
-        super().save(*args, **kwargs)
+    def process_delivery(self):
+        """Process items when pill is marked as delivered"""
+        for item in self.items.all():
+            # Create sales record
+            ProductSales.objects.create(
+                product=item.product,
+                quantity=item.quantity,
+                size=item.size,
+                color=item.color,
+                price_at_sale=item.product.discounted_price(),
+                pill=self
+            )
+            
+            # Decrease product availability
+            try:
+                availability = ProductAvailability.objects.get(
+                    product=item.product,
+                    size=item.size,
+                    color=item.color
+                )
+                if availability.quantity < item.quantity:
+                    raise ValidationError(f"Not enough inventory for {item.product.name}")
+                availability.quantity -= item.quantity
+                availability.save()
+            except ProductAvailability.DoesNotExist:
+                raise ValidationError(f"No matching availability for {item.product.name}")
+
+    def send_payment_notification(self):
+        """Send payment confirmation if phone exists"""
+        if hasattr(self, 'pilladdress') and self.pilladdress.phone:
+            prepare_whatsapp_message(self.pilladdress.phone, self)
 
     class Meta:
         verbose_name_plural = 'Bills'
@@ -556,7 +627,6 @@ class SpinWheelResult(models.Model):
         unique_together = [['user', 'spin_wheel', 'spin_date']]
 
     
-
 def prepare_whatsapp_message(phone_number, pill):
     print(f"Preparing WhatsApp message for phone number: {phone_number}")
     # Prepare the WhatsApp message
