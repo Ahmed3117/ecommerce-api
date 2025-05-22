@@ -31,21 +31,52 @@ GOVERNMENT_CHOICES = [
     ('27', 'South Sinai'),
 ]
 
+USER_TYPE_CHOICES = [
+        ('student', 'Student'),
+        ('parent', 'Parent'),
+        ('store', 'Store'),
+    ]
+    
+YEAR_CHOICES = [
+        ('first-secondary', 'First Secondary'),
+        ('second-secondary', 'Second Secondary'),
+        ('third-secondary', 'Third Secondary'),
+    ]
 
 class User(AbstractUser):
     name = models.CharField(max_length=100)
     otp = models.CharField(max_length=6, null=True, blank=True)
     otp_created_at = models.DateTimeField(null=True, blank=True)
-    email = models.EmailField(
-        blank=True,        
-        null=True,             
-        max_length=254     
+    email = models.EmailField(blank=True, null=True, max_length=254)
+    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES,default="student", null=True, blank=True)
+    phone = models.CharField(max_length=20, null=True, blank=True)
+    year = models.CharField(
+        max_length=20, 
+        choices=YEAR_CHOICES, 
+        null=True, 
+        blank=True,
+        help_text="Only applicable for students"
     )
 
     def __str__(self):
         return self.name if self.name else self.username
 
 
+class StudentData(models.Model):
+    user = models.OneToOneField(
+        User, 
+        on_delete=models.CASCADE,
+        limit_choices_to={'user_type': 'student'}
+    )
+    year = models.CharField(
+        max_length=20, 
+        choices=YEAR_CHOICES, 
+        null=True, 
+        blank=True
+    )
+    
+    def __str__(self):
+        return f"{self.user.name}'s student data"
 
 
 class UserAddress(models.Model):
